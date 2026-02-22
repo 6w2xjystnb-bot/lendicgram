@@ -4,14 +4,12 @@ TARGET := iphone:clang:latest:14.0
 
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = lendicgram
+LIBRARY_NAME = lendicgram
 
-lendicgram_FILES = Tweak.xm
+lendicgram_FILES = Tweak.m fishhook.c
 lendicgram_CFLAGS = -fobjc-arc
 lendicgram_FRAMEWORKS = UIKit Foundation
 lendicgram_LDFLAGS = -lsqlite3
+lendicgram_INSTALL_PATH = /Library/MobileSubstrate/DynamicLibraries
 
-include $(THEOS_MAKE_PATH)/tweak.mk
-
-after-install::
-	install.exec "killall -9 Telegram" || true
+include $(THEOS_MAKE_PATH)/library.mk

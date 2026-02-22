@@ -17,41 +17,33 @@ jobs:
 
       - name: Setup Theos
         run: |
-          # Install dependencies
           brew install ldid make
-
-          # Clone Theos
           export THEOS=$HOME/theos
           git clone --recursive https://github.com/theos/theos.git $THEOS
-
-          # Download iOS 14.5 SDK
           curl -sL https://github.com/theos/sdks/archive/master.tar.gz | tar xz
           mv sdks-master/*.sdk $THEOS/sdks/ 2>/dev/null || true
-
           echo "THEOS=$THEOS" >> $GITHUB_ENV
 
-      - name: Build tweak
+      - name: Build library
         run: |
           export THEOS=$HOME/theos
           export PATH=$THEOS/bin:$PATH
           gmake FINALPACKAGE=1
 
-      - name: Build .deb package
+      - name: Find and upload dylib
         run: |
-          export THEOS=$HOME/theos
-          export PATH=$THEOS/bin:$PATH
-          gmake package FINALPACKAGE=1
+          echo "=== Build output ==="
+          find .theos -name "*.dylib" -type f 2>/dev/null || echo "No dylib found in .theos"
+          find . -name "*.dylib" -type f 2>/dev/null || echo "No dylib found anywhere"
+          ls -la .theos/obj/ 2>/dev/null || true
+          ls -la .theos/obj/debug/ 2>/dev/null || true
+          ls -la .theos/obj/*/ 2>/dev/null || true
 
       - name: Upload dylib
         uses: actions/upload-artifact@v4
         with:
           name: lendicgram-dylib
-          path: .theos/obj/**/lendicgram.dylib
-          if-no-files-found: warn
-
-      - name: Upload .deb package
-        uses: actions/upload-artifact@v4
-        with:
-          name: lendicgram-deb
-          path: packages/*.deb
+          path: |
+            .theos/**/lendicgram.dylib
+            obj/**/lendicgram.dylib
           if-no-files-found: warn
