@@ -17,8 +17,8 @@
 // ──────────────────────────────────────────────────────────────────────
 // MARK: - Associated-object keys
 // ──────────────────────────────────────────────────────────────────────
-static const char kDeletedBadgeKey;
-static const char kOriginalAlphaKey;
+static const char kDeletedBadgeKey = '\0';
+static const char kOriginalAlphaKey = '\0';
 
 // ──────────────────────────────────────────────────────────────────────
 // MARK: - Constants
@@ -159,8 +159,8 @@ static int64_t _lendicgram_extractId(id obj, SEL sel) {
     UIView *cell = %orig;
 
     int64_t msgId = 0;
-    if ([self respondsToSelector:@selector(message)]) {
-        id msg = ((id(*)(id, SEL))objc_msgSend)(self, @selector(message));
+    if ([(id)self respondsToSelector:@selector(message)]) {
+        id msg = ((id(*)(id, SEL))objc_msgSend)((id)self, @selector(message));
         msgId = _lendicgram_extractId(msg, @selector(mid));
     }
 
@@ -182,7 +182,7 @@ static int64_t _lendicgram_extractId(id obj, SEL sel) {
 %hook ChatHistoryListNodeImpl
 
 - (void)removeMessagesAtIds:(id)messageIds {
-    int64_t chatId = _lendicgram_extractId(self, @selector(chatPeerId));
+    int64_t chatId = _lendicgram_extractId((id)self, @selector(chatPeerId));
 
     if ([messageIds isKindOfClass:[NSArray class]]) {
         for (NSNumber *msgId in (NSArray *)messageIds) {
@@ -192,8 +192,8 @@ static int64_t _lendicgram_extractId(id obj, SEL sel) {
     }
     // Suppress removal — do NOT call %orig
     // Trigger re-layout so the deleted style shows
-    if ([self respondsToSelector:@selector(setNeedsLayout)]) {
-        [(UIView *)self setNeedsLayout];
+    if ([(id)self respondsToSelector:@selector(setNeedsLayout)]) {
+        [(UIView *)(id)self setNeedsLayout];
     }
 }
 
@@ -211,8 +211,8 @@ static int64_t _lendicgram_extractId(id obj, SEL sel) {
     int64_t msgId = 0;
     int64_t chatId = 0;
 
-    if ([self respondsToSelector:@selector(item)]) {
-        id item = ((id(*)(id, SEL))objc_msgSend)(self, @selector(item));
+    if ([(id)self respondsToSelector:@selector(item)]) {
+        id item = ((id(*)(id, SEL))objc_msgSend)((id)self, @selector(item));
         if (item && [item respondsToSelector:@selector(message)]) {
             id message = ((id(*)(id, SEL))objc_msgSend)(item, @selector(message));
             msgId = _lendicgram_extractId(message, NSSelectorFromString(@"id"));
