@@ -6,9 +6,10 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = lendicgram
 
-lendicgram_FILES = Tweak.xm LendicgramManager.m
+lendicgram_FILES = Tweak.xm
 lendicgram_CFLAGS = -fobjc-arc
 lendicgram_FRAMEWORKS = UIKit Foundation
+lendicgram_LDFLAGS = -lsqlite3
 
 include $(THEOS_MAKE_PATH)/tweak.mk
 

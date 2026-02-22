@@ -1,305 +1,191 @@
 //
 //  Tweak.xm
-//  lendicgram — Anti-Delete Tweak for Telegram iOS
+//  lendicgram — Anti-Delete Tweak for Telegram iOS (v2: SQLite hook)
 //
-//  Hooks into Telegram iOS to intercept message deletion.
-//  Deleted messages become semi-transparent (alpha 0.45) with a red ✕ badge,
-//  similar to Ayugram's anti-delete feature.
+//  Hooks sqlite3_prepare_v2 via MobileSubstrate to intercept DELETE queries
+//  in Telegram's Postbox database. When the app tries to delete message rows,
+//  the query is replaced with a no-op (SELECT 0), keeping messages in the DB.
 //
-//  Compatible with Telegram iOS 10.x – 11.x (arm64).
+//  This approach works regardless of Swift/ObjC — it operates at the C level.
 //
 
+#import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
-#import <objc/runtime.h>
-#import <objc/message.h>
-#import "LendicgramManager.h"
+#import <substrate.h>
+#import <sqlite3.h>
+#import <string.h>
+#import <dlfcn.h>
 
 // ──────────────────────────────────────────────────────────────────────
-// MARK: - Associated-object keys
+// MARK: - Configuration
 // ──────────────────────────────────────────────────────────────────────
-static const char kDeletedBadgeKey = '\0';
-static const char kOriginalAlphaKey = '\0';
+
+// Set to YES to block all Postbox DELETEs (including user-initiated).
+// Set to NO to only log without blocking (diagnostic mode).
+static BOOL kBlockDeletes = YES;
+
+// Enable verbose logging to Console/syslog (filter: [lendicgram])
+static BOOL kVerboseLog = YES;
 
 // ──────────────────────────────────────────────────────────────────────
-// MARK: - Constants
+// MARK: - Helpers
 // ──────────────────────────────────────────────────────────────────────
-static CGFloat const kDeletedAlpha      = 0.45;
-static CGFloat const kBadgeSize         = 20.0;
-static CGFloat const kBadgeMargin       = 4.0;
 
-// ──────────────────────────────────────────────────────────────────────
-// MARK: - Helper: Create the ✕ badge view
-// ──────────────────────────────────────────────────────────────────────
-static UIView *_lendicgram_createBadge(void) {
-    UIView *badge = [[UIView alloc] initWithFrame:CGRectMake(0, 0, kBadgeSize, kBadgeSize)];
-    badge.backgroundColor = [UIColor colorWithRed:0.92 green:0.26 blue:0.24 alpha:0.90];
-    badge.layer.cornerRadius = kBadgeSize / 2.0;
-    badge.layer.masksToBounds = YES;
-    badge.tag = 0x4C454E44; // "LEND"
+// Check if the database belongs to Telegram's Postbox
+static BOOL isPostboxDatabase(sqlite3 *db) {
+    const char *path = sqlite3_db_filename(db, "main");
+    if (!path) return NO;
+    // Postbox database path contains "postbox" in the directory structure
+    return (strstr(path, "postbox") != NULL);
+}
 
-    UILabel *cross = [[UILabel alloc] initWithFrame:badge.bounds];
-    cross.text = @"✕";
-    cross.textColor = [UIColor whiteColor];
-    cross.font = [UIFont systemFontOfSize:12.0 weight:UIFontWeightBold];
-    cross.textAlignment = NSTextAlignmentCenter;
-    cross.adjustsFontSizeToFitWidth = YES;
-    [badge addSubview:cross];
-
-    return badge;
+// Check if this SQL is a DELETE statement
+static BOOL isDeleteStatement(const char *sql) {
+    if (!sql) return NO;
+    // Skip leading whitespace
+    while (*sql == ' ' || *sql == '\t' || *sql == '\n' || *sql == '\r') sql++;
+    return (strncasecmp(sql, "DELETE", 6) == 0);
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// MARK: - Helper: Apply deleted appearance to a cell/node view
+// MARK: - Stats tracking
 // ──────────────────────────────────────────────────────────────────────
-static void _lendicgram_applyDeletedStyle(UIView *contentView) {
-    if (!contentView) return;
 
-    NSNumber *saved = objc_getAssociatedObject(contentView, &kOriginalAlphaKey);
-    if (!saved) {
-        objc_setAssociatedObject(contentView, &kOriginalAlphaKey,
-                                 @(contentView.alpha),
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-
-    contentView.alpha = kDeletedAlpha;
-
-    UIView *existing = objc_getAssociatedObject(contentView, &kDeletedBadgeKey);
-    if (!existing) {
-        UIView *badge = _lendicgram_createBadge();
-
-        badge.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin |
-                                 UIViewAutoresizingFlexibleBottomMargin;
-        badge.frame = CGRectMake(
-            contentView.bounds.size.width - kBadgeSize - kBadgeMargin,
-            kBadgeMargin,
-            kBadgeSize,
-            kBadgeSize
-        );
-
-        [contentView addSubview:badge];
-        objc_setAssociatedObject(contentView, &kDeletedBadgeKey,
-                                 badge,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-}
+static NSUInteger sBlockedCount = 0;
+static NSUInteger sAllowedCount = 0;
 
 // ──────────────────────────────────────────────────────────────────────
-// MARK: - Helper: Restore normal appearance
+// MARK: - sqlite3_prepare_v2 hook
 // ──────────────────────────────────────────────────────────────────────
-static void _lendicgram_removeDeletedStyle(UIView *contentView) {
-    if (!contentView) return;
 
-    NSNumber *saved = objc_getAssociatedObject(contentView, &kOriginalAlphaKey);
-    contentView.alpha = saved ? saved.doubleValue : 1.0;
+// Original function pointer (filled by MSHookFunction)
+static int (*orig_sqlite3_prepare_v2)(sqlite3 *db,
+                                       const char *zSql,
+                                       int nByte,
+                                       sqlite3_stmt **ppStmt,
+                                       const char **pzTail);
 
-    UIView *badge = objc_getAssociatedObject(contentView, &kDeletedBadgeKey);
-    [badge removeFromSuperview];
-    objc_setAssociatedObject(contentView, &kDeletedBadgeKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(contentView, &kOriginalAlphaKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-}
+static int hooked_sqlite3_prepare_v2(sqlite3 *db,
+                                      const char *zSql,
+                                      int nByte,
+                                      sqlite3_stmt **ppStmt,
+                                      const char **pzTail) {
+    // Only intercept DELETE statements on the Postbox database
+    if (zSql && isDeleteStatement(zSql) && isPostboxDatabase(db)) {
 
-// ──────────────────────────────────────────────────────────────────────
-// MARK: - Helper: Safely extract int64 from an object
-// ──────────────────────────────────────────────────────────────────────
-static int64_t _lendicgram_extractId(id obj, SEL sel) {
-    if (obj && [obj respondsToSelector:sel]) {
-        id val = ((id(*)(id, SEL))objc_msgSend)(obj, sel);
-        if ([val respondsToSelector:@selector(longLongValue)]) {
-            return [val longLongValue];
+        if (kVerboseLog) {
+            // Log the first 200 chars of the query for debugging
+            NSLog(@"[lendicgram] POSTBOX DELETE detected (#%lu): %.200s",
+                  (unsigned long)(sBlockedCount + 1), zSql);
         }
-    }
-    return 0;
-}
 
-// ══════════════════════════════════════════════════════════════════════
-// MARK: - Hook 1 — TGModernConversationController (legacy)
-// ══════════════════════════════════════════════════════════════════════
-
-%hook TGModernConversationController
-
-- (void)_deleteMessages:(id)messageIds animated:(BOOL)animated {
-    if ([messageIds isKindOfClass:[NSArray class]]) {
-        for (NSNumber *msgId in (NSArray *)messageIds) {
-            [[LendicgramManager sharedManager] markMessageAsDeleted:msgId.longLongValue
-                                                             inChat:0];
-        }
-    }
-    // Suppress deletion — do NOT call %orig
-}
-
-%end
-
-// ══════════════════════════════════════════════════════════════════════
-// MARK: - Hook 2 — TGGenericModernConversationCompanion
-// ══════════════════════════════════════════════════════════════════════
-
-%hook TGGenericModernConversationCompanion
-
-- (void)controllerDeletedMessages:(id)messageIds forEveryone:(BOOL)forEveryone {
-    int64_t chatId = _lendicgram_extractId(self, @selector(conversationId));
-
-    if ([messageIds isKindOfClass:[NSArray class]]) {
-        for (NSNumber *msgId in (NSArray *)messageIds) {
-            [[LendicgramManager sharedManager] markMessageAsDeleted:msgId.longLongValue
-                                                             inChat:chatId];
-        }
-    }
-    // Suppress deletion — do NOT call %orig
-}
-
-%end
-
-// ══════════════════════════════════════════════════════════════════════
-// MARK: - Hook 3 — TGMessageModernConversationItem (legacy cells)
-// ══════════════════════════════════════════════════════════════════════
-
-%hook TGMessageModernConversationItem
-
-- (UIView *)cellForItem {
-    UIView *cell = %orig;
-
-    int64_t msgId = 0;
-    if ([(id)self respondsToSelector:@selector(message)]) {
-        id msg = ((id(*)(id, SEL))objc_msgSend)((id)self, @selector(message));
-        msgId = _lendicgram_extractId(msg, @selector(mid));
-    }
-
-    if ([[LendicgramManager sharedManager] isMessageDeleted:msgId inChat:0]) {
-        _lendicgram_applyDeletedStyle(cell);
-    } else {
-        _lendicgram_removeDeletedStyle(cell);
-    }
-
-    return cell;
-}
-
-%end
-
-// ══════════════════════════════════════════════════════════════════════
-// MARK: - Hook 4 — ChatHistoryListNodeImpl (Swift bridge, TG 9.x+)
-// ══════════════════════════════════════════════════════════════════════
-
-%hook ChatHistoryListNodeImpl
-
-- (void)removeMessagesAtIds:(id)messageIds {
-    int64_t chatId = _lendicgram_extractId((id)self, @selector(chatPeerId));
-
-    if ([messageIds isKindOfClass:[NSArray class]]) {
-        for (NSNumber *msgId in (NSArray *)messageIds) {
-            [[LendicgramManager sharedManager] markMessageAsDeleted:msgId.longLongValue
-                                                             inChat:chatId];
-        }
-    }
-    // Suppress removal — do NOT call %orig
-    // Trigger re-layout so the deleted style shows
-    if ([(id)self respondsToSelector:@selector(setNeedsLayout)]) {
-        [(UIView *)(id)self setNeedsLayout];
-    }
-}
-
-%end
-
-// ══════════════════════════════════════════════════════════════════════
-// MARK: - Hook 5 — ChatMessageBubbleItemNode (message bubble UI)
-// ══════════════════════════════════════════════════════════════════════
-
-%hook ChatMessageBubbleItemNode
-
-- (void)layoutSubviews {
-    %orig;
-
-    int64_t msgId = 0;
-    int64_t chatId = 0;
-
-    if ([(id)self respondsToSelector:@selector(item)]) {
-        id item = ((id(*)(id, SEL))objc_msgSend)((id)self, @selector(item));
-        if (item && [item respondsToSelector:@selector(message)]) {
-            id message = ((id(*)(id, SEL))objc_msgSend)(item, @selector(message));
-            msgId = _lendicgram_extractId(message, NSSelectorFromString(@"id"));
+        if (kBlockDeletes) {
+            sBlockedCount++;
+            // Replace the DELETE with a no-op SELECT — the statement
+            // succeeds (no error) but nothing is deleted from the DB.
+            return orig_sqlite3_prepare_v2(db, "SELECT 0", -1, ppStmt, pzTail);
         }
     }
 
-    if ([[LendicgramManager sharedManager] isMessageDeleted:msgId inChat:chatId]) {
-        _lendicgram_applyDeletedStyle((UIView *)self);
-    } else {
-        _lendicgram_removeDeletedStyle((UIView *)self);
-    }
+    sAllowedCount++;
+    return orig_sqlite3_prepare_v2(db, zSql, nByte, ppStmt, pzTail);
 }
 
-%end
+// ──────────────────────────────────────────────────────────────────────
+// MARK: - sqlite3_prepare (v1 fallback) hook
+// ──────────────────────────────────────────────────────────────────────
 
-// ══════════════════════════════════════════════════════════════════════
-// MARK: - Hook 6 — AccountStateManagerImpl (server-pushed deletions)
-// ══════════════════════════════════════════════════════════════════════
+static int (*orig_sqlite3_prepare)(sqlite3 *db,
+                                    const char *zSql,
+                                    int nByte,
+                                    sqlite3_stmt **ppStmt,
+                                    const char **pzTail);
 
-%hook AccountStateManagerImpl
-
-- (void)deleteMessages:(id)messageIds peerId:(id)peerId {
-    int64_t chatId = 0;
-    if ([peerId respondsToSelector:@selector(longLongValue)]) {
-        chatId = [peerId longLongValue];
-    }
-
-    if ([messageIds isKindOfClass:[NSArray class]]) {
-        for (NSNumber *msgId in (NSArray *)messageIds) {
-            [[LendicgramManager sharedManager] markMessageAsDeleted:msgId.longLongValue
-                                                             inChat:chatId];
+static int hooked_sqlite3_prepare(sqlite3 *db,
+                                   const char *zSql,
+                                   int nByte,
+                                   sqlite3_stmt **ppStmt,
+                                   const char **pzTail) {
+    if (zSql && isDeleteStatement(zSql) && isPostboxDatabase(db)) {
+        if (kBlockDeletes) {
+            sBlockedCount++;
+            if (kVerboseLog) {
+                NSLog(@"[lendicgram] POSTBOX DELETE (v1) blocked: %.200s", zSql);
+            }
+            return orig_sqlite3_prepare(db, "SELECT 0", -1, ppStmt, pzTail);
         }
     }
-    // Suppress deletion — do NOT call %orig
+    return orig_sqlite3_prepare(db, zSql, nByte, ppStmt, pzTail);
 }
 
-%end
+// ──────────────────────────────────────────────────────────────────────
+// MARK: - sqlite3_exec hook (some operations use exec directly)
+// ──────────────────────────────────────────────────────────────────────
 
-// ══════════════════════════════════════════════════════════════════════
-// MARK: - Hook 7 — TGDatabaseMessageDraft (safeguard)
-// ══════════════════════════════════════════════════════════════════════
+static int (*orig_sqlite3_exec)(sqlite3 *db,
+                                 const char *zSql,
+                                 int (*callback)(void*, int, char**, char**),
+                                 void *arg,
+                                 char **errmsg);
 
-%hook TGDatabaseMessageDraft
-%end
+static int hooked_sqlite3_exec(sqlite3 *db,
+                                const char *zSql,
+                                int (*callback)(void*, int, char**, char**),
+                                void *arg,
+                                char **errmsg) {
+    if (zSql && isDeleteStatement(zSql) && isPostboxDatabase(db)) {
+        if (kBlockDeletes) {
+            sBlockedCount++;
+            if (kVerboseLog) {
+                NSLog(@"[lendicgram] POSTBOX DELETE (exec) blocked: %.200s", zSql);
+            }
+            // Return SQLITE_OK without actually executing the DELETE
+            return SQLITE_OK;
+        }
+    }
+    return orig_sqlite3_exec(db, zSql, callback, arg, errmsg);
+}
 
-// ══════════════════════════════════════════════════════════════════════
-// MARK: - Constructor: Initialize + runtime discovery
-// ══════════════════════════════════════════════════════════════════════
+// ──────────────────────────────────────────────────────────────────────
+// MARK: - Constructor: install hooks
+// ──────────────────────────────────────────────────────────────────────
 
 %ctor {
-    %init;
+    @autoreleasepool {
+        NSLog(@"[lendicgram] Anti-delete tweak v2 (SQLite hook) loading...");
 
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-
-        // Discover Swift ChatController delete-related selectors for debugging
-        Class chatCtrl = NSClassFromString(@"TelegramUI.ChatControllerImpl");
-        if (chatCtrl) {
-            unsigned int count = 0;
-            Method *methods = class_copyMethodList(chatCtrl, &count);
-            for (unsigned int i = 0; i < count; i++) {
-                SEL sel = method_getName(methods[i]);
-                NSString *selName = NSStringFromSelector(sel);
-                if ([selName containsString:@"deleteMessage"] ||
-                    [selName containsString:@"removeMessage"]) {
-                    NSLog(@"[lendicgram] ChatControllerImpl selector: %@", selName);
-                }
-            }
-            if (methods) free(methods);
+        // Load user preferences (if set)
+        NSUserDefaults *prefs = [[NSUserDefaults alloc] initWithSuiteName:@"com.lendicgram"];
+        if ([prefs objectForKey:@"blockDeletes"] != nil) {
+            kBlockDeletes = [prefs boolForKey:@"blockDeletes"];
+        }
+        if ([prefs objectForKey:@"verboseLog"] != nil) {
+            kVerboseLog = [prefs boolForKey:@"verboseLog"];
         }
 
-        Class postbox = NSClassFromString(@"Postbox.MessageHistoryTable");
-        if (postbox) {
-            unsigned int count = 0;
-            Method *methods = class_copyMethodList(postbox, &count);
-            for (unsigned int i = 0; i < count; i++) {
-                SEL sel = method_getName(methods[i]);
-                NSString *selName = NSStringFromSelector(sel);
-                if ([selName containsString:@"remove"] ||
-                    [selName containsString:@"delete"]) {
-                    NSLog(@"[lendicgram] MessageHistoryTable selector: %@", selName);
-                }
-            }
-            if (methods) free(methods);
-        }
+        // Hook sqlite3_prepare_v2 — main query preparation function
+        MSHookFunction((void *)sqlite3_prepare_v2,
+                        (void *)hooked_sqlite3_prepare_v2,
+                        (void **)&orig_sqlite3_prepare_v2);
 
-        NSLog(@"[lendicgram] Anti-delete tweak loaded. %lu saved messages.",
-              (unsigned long)[[LendicgramManager sharedManager] deletedMessageCount]);
-    });
+        // Hook sqlite3_prepare — fallback for older API usage
+        MSHookFunction((void *)sqlite3_prepare,
+                        (void *)hooked_sqlite3_prepare,
+                        (void **)&orig_sqlite3_prepare);
+
+        // Hook sqlite3_exec — some batch operations use this
+        MSHookFunction((void *)sqlite3_exec,
+                        (void *)hooked_sqlite3_exec,
+                        (void **)&orig_sqlite3_exec);
+
+        NSLog(@"[lendicgram] Hooks installed. blockDeletes=%d, verboseLog=%d",
+              kBlockDeletes, kVerboseLog);
+
+        // Show a subtle notification on first launch with the tweak
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            NSLog(@"[lendicgram] Tweak active. Blocked %lu DELETEs so far.",
+                  (unsigned long)sBlockedCount);
+        });
+    }
 }
