@@ -1,0 +1,57 @@
+name: Build lendicgram
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Theos
+        run: |
+          # Install dependencies
+          brew install ldid make
+
+          # Clone Theos
+          export THEOS=$HOME/theos
+          git clone --recursive https://github.com/theos/theos.git $THEOS
+
+          # Download iOS 14.5 SDK
+          curl -sL https://github.com/theos/sdks/archive/master.tar.gz | tar xz
+          mv sdks-master/*.sdk $THEOS/sdks/ 2>/dev/null || true
+
+          echo "THEOS=$THEOS" >> $GITHUB_ENV
+
+      - name: Build tweak
+        run: |
+          export THEOS=$HOME/theos
+          export PATH=$THEOS/bin:$PATH
+          gmake FINALPACKAGE=1
+
+      - name: Build .deb package
+        run: |
+          export THEOS=$HOME/theos
+          export PATH=$THEOS/bin:$PATH
+          gmake package FINALPACKAGE=1
+
+      - name: Upload dylib
+        uses: actions/upload-artifact@v4
+        with:
+          name: lendicgram-dylib
+          path: .theos/obj/**/lendicgram.dylib
+          if-no-files-found: warn
+
+      - name: Upload .deb package
+        uses: actions/upload-artifact@v4
+        with:
+          name: lendicgram-deb
+          path: packages/*.deb
+          if-no-files-found: warn
