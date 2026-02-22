@@ -30,20 +30,23 @@ jobs:
           export PATH=$THEOS/bin:$PATH
           gmake FINALPACKAGE=1
 
-      - name: Find and upload dylib
+      - name: Find dylib
         run: |
-          echo "=== Build output ==="
-          find .theos -name "*.dylib" -type f 2>/dev/null || echo "No dylib found in .theos"
-          find . -name "*.dylib" -type f 2>/dev/null || echo "No dylib found anywhere"
-          ls -la .theos/obj/ 2>/dev/null || true
-          ls -la .theos/obj/debug/ 2>/dev/null || true
-          ls -la .theos/obj/*/ 2>/dev/null || true
+          echo "=== All dylibs ==="
+          find . -name "*.dylib" -type f 2>/dev/null
+          echo "=== .theos contents ==="
+          find .theos -type f 2>/dev/null | head -50
+          echo "=== obj contents ==="
+          find obj -type f 2>/dev/null | head -20
+          # Copy dylib to a known location
+          mkdir -p output
+          find . -name "lendicgram.dylib" -exec cp {} output/ \; 2>/dev/null
+          find . -name "liblendicgram.dylib" -exec cp {} output/ \; 2>/dev/null
+          ls -la output/ || echo "No output files"
 
       - name: Upload dylib
         uses: actions/upload-artifact@v4
         with:
           name: lendicgram-dylib
-          path: |
-            .theos/**/lendicgram.dylib
-            obj/**/lendicgram.dylib
+          path: output/
           if-no-files-found: warn
