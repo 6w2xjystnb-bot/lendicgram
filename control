@@ -1,6 +1,6 @@
 Package: com.lendicgram.antidelete
 Name: lendicgram
-Depends: mobilesubstrate
+Depends: firmware
 Version: 1.0.0
 Architecture: iphoneos-arm64
 Description: Anti-delete tweak for Telegram iOS. Deleted messages become transparent with a cross icon instead of disappearing.
