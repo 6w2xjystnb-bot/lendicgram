@@ -11,14 +11,14 @@
 
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
+#import <objc/message.h>
 #import "LendicgramManager.h"
 
 // ──────────────────────────────────────────────────────────────────────
 // MARK: - Associated-object keys
 // ──────────────────────────────────────────────────────────────────────
-static const char kDeletedFlagKey;          // BOOL wrapper
-static const char kDeletedBadgeKey;         // UIView* cross badge
-static const char kOriginalAlphaKey;        // NSNumber (CGFloat)
+static const char kDeletedBadgeKey;
+static const char kOriginalAlphaKey;
 
 // ──────────────────────────────────────────────────────────────────────
 // MARK: - Constants
@@ -35,9 +35,8 @@ static UIView *_lendicgram_createBadge(void) {
     badge.backgroundColor = [UIColor colorWithRed:0.92 green:0.26 blue:0.24 alpha:0.90];
     badge.layer.cornerRadius = kBadgeSize / 2.0;
     badge.layer.masksToBounds = YES;
-    badge.tag = 0x4C454E44; // "LEND" — easy to find later
+    badge.tag = 0x4C454E44; // "LEND"
 
-    // Draw a small ✕ using a UILabel
     UILabel *cross = [[UILabel alloc] initWithFrame:badge.bounds];
     cross.text = @"✕";
     cross.textColor = [UIColor whiteColor];
@@ -55,7 +54,6 @@ static UIView *_lendicgram_createBadge(void) {
 static void _lendicgram_applyDeletedStyle(UIView *contentView) {
     if (!contentView) return;
 
-    // Save original alpha once
     NSNumber *saved = objc_getAssociatedObject(contentView, &kOriginalAlphaKey);
     if (!saved) {
         objc_setAssociatedObject(contentView, &kOriginalAlphaKey,
@@ -65,12 +63,10 @@ static void _lendicgram_applyDeletedStyle(UIView *contentView) {
 
     contentView.alpha = kDeletedAlpha;
 
-    // Add badge if not already present
     UIView *existing = objc_getAssociatedObject(contentView, &kDeletedBadgeKey);
     if (!existing) {
         UIView *badge = _lendicgram_createBadge();
 
-        // Position: top-right of the content view
         badge.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin |
                                  UIViewAutoresizingFlexibleBottomMargin;
         badge.frame = CGRectMake(
@@ -88,7 +84,7 @@ static void _lendicgram_applyDeletedStyle(UIView *contentView) {
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// MARK: - Helper: Restore normal appearance (if message reemerges)
+// MARK: - Helper: Restore normal appearance
 // ──────────────────────────────────────────────────────────────────────
 static void _lendicgram_removeDeletedStyle(UIView *contentView) {
     if (!contentView) return;
@@ -102,77 +98,60 @@ static void _lendicgram_removeDeletedStyle(UIView *contentView) {
     objc_setAssociatedObject(contentView, &kOriginalAlphaKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-// ══════════════════════════════════════════════════════════════════════
-// MARK: - Hook 1 — Intercept message deletion at the account level
-// ══════════════════════════════════════════════════════════════════════
-//
-// Telegram iOS uses a Swift-based Postbox layer, but higher-level
-// controllers still route through Objective-C bridge classes.
-// We hook the commonly seen ObjC selectors related to message removal.
-//
-// If the target class/method doesn't exist (different TG version), the
-// hook is silently ignored by Logos.
-// ══════════════════════════════════════════════════════════════════════
+// ──────────────────────────────────────────────────────────────────────
+// MARK: - Helper: Safely extract int64 from an object
+// ──────────────────────────────────────────────────────────────────────
+static int64_t _lendicgram_extractId(id obj, SEL sel) {
+    if (obj && [obj respondsToSelector:sel]) {
+        id val = ((id(*)(id, SEL))objc_msgSend)(obj, sel);
+        if ([val respondsToSelector:@selector(longLongValue)]) {
+            return [val longLongValue];
+        }
+    }
+    return 0;
+}
 
-// ---------- TGModernConversationController (legacy & bridged) ---------
+// ══════════════════════════════════════════════════════════════════════
+// MARK: - Hook 1 — TGModernConversationController (legacy)
+// ══════════════════════════════════════════════════════════════════════
 
 %hook TGModernConversationController
 
-// Intercept when messages are requested to be deleted from the companion
-- (void)_deleteMessages:(NSArray *)messageIds animated:(BOOL)animated {
-    // Save each message ID before the original code removes them
-    for (NSNumber *msgId in messageIds) {
-        [[LendicgramManager sharedManager] markMessageAsDeleted:msgId.longLongValue
-                                                         inChat:0]; // chatId resolved below if available
+- (void)_deleteMessages:(id)messageIds animated:(BOOL)animated {
+    if ([messageIds isKindOfClass:[NSArray class]]) {
+        for (NSNumber *msgId in (NSArray *)messageIds) {
+            [[LendicgramManager sharedManager] markMessageAsDeleted:msgId.longLongValue
+                                                             inChat:0];
+        }
     }
-    // Do NOT call %orig — suppress the actual deletion
-    // Instead, just reload the messages so they re-draw with deleted style
-    if ([self respondsToSelector:@selector(updateMessages)]) {
-        [self performSelector:@selector(updateMessages)];
-    }
+    // Suppress deletion — do NOT call %orig
 }
 
 %end
 
-// ---------- TGGenericModernConversationCompanion ---------------------
+// ══════════════════════════════════════════════════════════════════════
+// MARK: - Hook 2 — TGGenericModernConversationCompanion
+// ══════════════════════════════════════════════════════════════════════
 
 %hook TGGenericModernConversationCompanion
 
-- (void)controllerDeletedMessages:(NSArray *)messageIds
-                    forEveryone:(bool)forEveryone {
-    int64_t chatId = 0;
-    if ([self respondsToSelector:@selector(conversationId)]) {
-        chatId = ((NSNumber *)[self performSelector:@selector(conversationId)]).longLongValue;
+- (void)controllerDeletedMessages:(id)messageIds forEveryone:(BOOL)forEveryone {
+    int64_t chatId = _lendicgram_extractId(self, @selector(conversationId));
+
+    if ([messageIds isKindOfClass:[NSArray class]]) {
+        for (NSNumber *msgId in (NSArray *)messageIds) {
+            [[LendicgramManager sharedManager] markMessageAsDeleted:msgId.longLongValue
+                                                             inChat:chatId];
+        }
     }
-    for (NSNumber *msgId in messageIds) {
-        [[LendicgramManager sharedManager] markMessageAsDeleted:msgId.longLongValue
-                                                         inChat:chatId];
-    }
-    // Suppress original — do not actually delete
+    // Suppress deletion — do NOT call %orig
 }
 
 %end
 
 // ══════════════════════════════════════════════════════════════════════
-// MARK: - Hook 2 — Real-time incoming deletions (remote peer deletes)
+// MARK: - Hook 3 — TGMessageModernConversationItem (legacy cells)
 // ══════════════════════════════════════════════════════════════════════
-// When the server pushes a "delete messages" update, Telegram processes
-// it through TGUpdateMessageService / TGChannelStateSignals or similar.
-// We intercept at the bridge layer.
-// ══════════════════════════════════════════════════════════════════════
-
-%hook TGDatabaseMessageDraft
-
-// Some Telegram versions route remote deletions through the database
-// update path. We add a safeguard hook here.
-
-%end
-
-// ══════════════════════════════════════════════════════════════════════
-// MARK: - Hook 3 — Visual: style message cells for deleted content
-// ══════════════════════════════════════════════════════════════════════
-
-// ---------- TGModernConversationItem (legacy cells) ------------------
 
 %hook TGMessageModernConversationItem
 
@@ -180,17 +159,12 @@ static void _lendicgram_removeDeletedStyle(UIView *contentView) {
     UIView *cell = %orig;
 
     int64_t msgId = 0;
-    int64_t chatId = 0;
-
-    // Try to extract message ID from the item
     if ([self respondsToSelector:@selector(message)]) {
-        id msg = [self performSelector:@selector(message)];
-        if ([msg respondsToSelector:@selector(mid)]) {
-            msgId = ((NSNumber *)[msg performSelector:@selector(mid)]).longLongValue;
-        }
+        id msg = ((id(*)(id, SEL))objc_msgSend)(self, @selector(message));
+        msgId = _lendicgram_extractId(msg, @selector(mid));
     }
 
-    if ([[LendicgramManager sharedManager] isMessageDeleted:msgId inChat:chatId]) {
+    if ([[LendicgramManager sharedManager] isMessageDeleted:msgId inChat:0]) {
         _lendicgram_applyDeletedStyle(cell);
     } else {
         _lendicgram_removeDeletedStyle(cell);
@@ -202,35 +176,22 @@ static void _lendicgram_removeDeletedStyle(UIView *contentView) {
 %end
 
 // ══════════════════════════════════════════════════════════════════════
-// MARK: - Hook 4 — Swift-based ChatController (Telegram 9.x+)
+// MARK: - Hook 4 — ChatHistoryListNodeImpl (Swift bridge, TG 9.x+)
 // ══════════════════════════════════════════════════════════════════════
-//
-// Modern Telegram iOS is Swift. Many of the internal classes expose
-// Objective-C-compatible selectors via @objc. We hook the chat list
-// node and message bubble nodes that are accessible from ObjC runtime.
-// ══════════════════════════════════════════════════════════════════════
-
-// ---------- ChatHistoryListNode (manages visible message nodes) ------
 
 %hook ChatHistoryListNodeImpl
 
-// Called when messages are removed from the list
-- (void)removeMessagesAtIds:(NSArray *)messageIds {
-    int64_t chatId = 0;
-    if ([self respondsToSelector:@selector(chatPeerId)]) {
-        id peerId = [self performSelector:@selector(chatPeerId)];
-        if ([peerId respondsToSelector:@selector(longLongValue)]) {
-            chatId = [peerId longLongValue];
+- (void)removeMessagesAtIds:(id)messageIds {
+    int64_t chatId = _lendicgram_extractId(self, @selector(chatPeerId));
+
+    if ([messageIds isKindOfClass:[NSArray class]]) {
+        for (NSNumber *msgId in (NSArray *)messageIds) {
+            [[LendicgramManager sharedManager] markMessageAsDeleted:msgId.longLongValue
+                                                             inChat:chatId];
         }
     }
-
-    for (NSNumber *msgId in messageIds) {
-        [[LendicgramManager sharedManager] markMessageAsDeleted:msgId.longLongValue
-                                                         inChat:chatId];
-    }
-
-    // Suppress original removal — messages stay in the list
-    // Trigger a layout update so the deleted style is applied
+    // Suppress removal — do NOT call %orig
+    // Trigger re-layout so the deleted style shows
     if ([self respondsToSelector:@selector(setNeedsLayout)]) {
         [(UIView *)self setNeedsLayout];
     }
@@ -238,27 +199,23 @@ static void _lendicgram_removeDeletedStyle(UIView *contentView) {
 
 %end
 
-// ---------- ChatMessageBubbleItemNode (individual message bubble) ----
+// ══════════════════════════════════════════════════════════════════════
+// MARK: - Hook 5 — ChatMessageBubbleItemNode (message bubble UI)
+// ══════════════════════════════════════════════════════════════════════
 
 %hook ChatMessageBubbleItemNode
 
 - (void)layoutSubviews {
     %orig;
 
-    // Try to get the message from the item
     int64_t msgId = 0;
     int64_t chatId = 0;
 
     if ([self respondsToSelector:@selector(item)]) {
-        id item = [self performSelector:@selector(item)];
-        if ([item respondsToSelector:@selector(message)]) {
-            id message = [item performSelector:@selector(message)];
-            if ([message respondsToSelector:@selector(id)]) {
-                id msgIdObj = [message performSelector:@selector(id)];
-                if ([msgIdObj respondsToSelector:@selector(longLongValue)]) {
-                    msgId = [msgIdObj longLongValue];
-                }
-            }
+        id item = ((id(*)(id, SEL))objc_msgSend)(self, @selector(item));
+        if (item && [item respondsToSelector:@selector(message)]) {
+            id message = ((id(*)(id, SEL))objc_msgSend)(item, @selector(message));
+            msgId = _lendicgram_extractId(message, NSSelectorFromString(@"id"));
         }
     }
 
@@ -272,47 +229,48 @@ static void _lendicgram_removeDeletedStyle(UIView *contentView) {
 %end
 
 // ══════════════════════════════════════════════════════════════════════
-// MARK: - Hook 5 — Intercept server-pushed deletion updates
-// ══════════════════════════════════════════════════════════════════════
-// The AccountStateManager processes TL updates from the server.
-// We hook the final "apply hole" / "remove messages" path.
+// MARK: - Hook 6 — AccountStateManagerImpl (server-pushed deletions)
 // ══════════════════════════════════════════════════════════════════════
 
 %hook AccountStateManagerImpl
 
-- (void)deleteMessages:(NSArray *)messageIds peerId:(id)peerId {
+- (void)deleteMessages:(id)messageIds peerId:(id)peerId {
     int64_t chatId = 0;
     if ([peerId respondsToSelector:@selector(longLongValue)]) {
         chatId = [peerId longLongValue];
     }
 
-    for (NSNumber *msgId in messageIds) {
-        [[LendicgramManager sharedManager] markMessageAsDeleted:msgId.longLongValue
-                                                         inChat:chatId];
+    if ([messageIds isKindOfClass:[NSArray class]]) {
+        for (NSNumber *msgId in (NSArray *)messageIds) {
+            [[LendicgramManager sharedManager] markMessageAsDeleted:msgId.longLongValue
+                                                             inChat:chatId];
+        }
     }
-    // Do NOT call %orig — suppress actual deletion from database
+    // Suppress deletion — do NOT call %orig
 }
 
 %end
 
 // ══════════════════════════════════════════════════════════════════════
-// MARK: - Hook 6 — Fallback: generic NSNotification observer
+// MARK: - Hook 7 — TGDatabaseMessageDraft (safeguard)
 // ══════════════════════════════════════════════════════════════════════
-// As a safety net, we observe Telegram's internal "messages deleted"
-// notification (if posted) and intercept it.
+
+%hook TGDatabaseMessageDraft
+%end
+
+// ══════════════════════════════════════════════════════════════════════
+// MARK: - Constructor: Initialize + runtime discovery
 // ══════════════════════════════════════════════════════════════════════
 
 %ctor {
     %init;
 
-    // Additional runtime-based hooks for Swift classes discovered at load
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
 
-        // Try to find and hook Swift ChatController delete methods at runtime
+        // Discover Swift ChatController delete-related selectors for debugging
         Class chatCtrl = NSClassFromString(@"TelegramUI.ChatControllerImpl");
         if (chatCtrl) {
-            // Enumerate methods looking for delete-related selectors
             unsigned int count = 0;
             Method *methods = class_copyMethodList(chatCtrl, &count);
             for (unsigned int i = 0; i < count; i++) {
@@ -320,13 +278,12 @@ static void _lendicgram_removeDeletedStyle(UIView *contentView) {
                 NSString *selName = NSStringFromSelector(sel);
                 if ([selName containsString:@"deleteMessage"] ||
                     [selName containsString:@"removeMessage"]) {
-                    NSLog(@"[lendicgram] Found delete selector on ChatControllerImpl: %@", selName);
+                    NSLog(@"[lendicgram] ChatControllerImpl selector: %@", selName);
                 }
             }
             if (methods) free(methods);
         }
 
-        // Also check for Postbox-level removal
         Class postbox = NSClassFromString(@"Postbox.MessageHistoryTable");
         if (postbox) {
             unsigned int count = 0;
@@ -336,13 +293,13 @@ static void _lendicgram_removeDeletedStyle(UIView *contentView) {
                 NSString *selName = NSStringFromSelector(sel);
                 if ([selName containsString:@"remove"] ||
                     [selName containsString:@"delete"]) {
-                    NSLog(@"[lendicgram] Found removal selector on MessageHistoryTable: %@", selName);
+                    NSLog(@"[lendicgram] MessageHistoryTable selector: %@", selName);
                 }
             }
             if (methods) free(methods);
         }
 
-        NSLog(@"[lendicgram] Anti-delete tweak loaded. Manager has %lu saved messages.",
+        NSLog(@"[lendicgram] Anti-delete tweak loaded. %lu saved messages.",
               (unsigned long)[[LendicgramManager sharedManager] deletedMessageCount]);
     });
 }
