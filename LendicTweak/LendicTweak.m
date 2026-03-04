@@ -23,7 +23,46 @@
  */
 
 #import "LendicTweak.h"
+#import <UIKit/UIKit.h>
 #import <objc/runtime.h>
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  LendicUI (Visual Indicators)
+// ═══════════════════════════════════════════════════════════════════════════
+
+@interface LendicUI : NSObject
++ (void)showToast:(NSString *)msg color:(UIColor *)color;
+@end
+
+@implementation LendicUI
++ (void)showToast:(NSString *)msg color:(UIColor *)color {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UIWindow *w = [UIApplication sharedApplication].keyWindow;
+        if (!w) {
+            for (UIWindow *win in [UIApplication sharedApplication].windows) {
+                if (win.isKeyWindow) { w = win; break; }
+            }
+        }
+        if (!w) return;
+        
+        UILabel *l = [[UILabel alloc] initWithFrame:CGRectMake(20, 50, w.bounds.size.width - 40, 50)];
+        l.backgroundColor = [color colorWithAlphaComponent:0.9];
+        l.textColor = [UIColor whiteColor];
+        l.textAlignment = NSTextAlignmentCenter;
+        l.font = [UIFont boldSystemFontOfSize:14];
+        l.layer.cornerRadius = 10;
+        l.clipsToBounds = YES;
+        l.text = msg;
+        l.numberOfLines = 0;
+        l.layer.zPosition = 99999;
+        [w addSubview:l];
+        
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [UIView animateWithDuration:0.5 animations:^{ l.alpha = 0; } completion:^(BOOL f){ [l removeFromSuperview]; }];
+        });
+    });
+}
+@end
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  LendicSCTrack
@@ -433,6 +472,7 @@ static NSURLSession *gForwardingSession = nil;
         void(^inject)(LendicSCTrack *) = ^(LendicSCTrack *track) {
             NSData *fake = [NSJSONSerialization dataWithJSONObject:[track asYandexDownloadInfo] options:0 error:nil];
             [self finishWithData:fake response:response statusCode:200];
+            [LendicUI showToast:[NSString stringWithFormat:@"🎵 Playing SC:\n%@", track.title] color:[UIColor systemBlueColor]];
         };
 
         if (scId) {
@@ -525,6 +565,9 @@ static NSURLSession *gForwardingSession = nil;
             
             NSData *newData = [NSJSONSerialization dataWithJSONObject:mutJson options:0 error:nil];
             [self finishWithData:newData response:response statusCode:code];
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                [LendicUI showToast:[NSString stringWithFormat:@"🔎 Injected %lu SC Tracks", (unsigned long)novel.count] color:[UIColor systemPurpleColor]];
+            });
         }];
         return; // wait for async search
     }
@@ -580,7 +623,14 @@ static void LendicSetup(void) {
 
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         [[LendicManager shared] ensureClientId:^(NSString *cid) {
-            LENDIC_LOG(@"🟢 LendicTweak v3 (NSURLProtocol) Ready — client_id: %@", cid);
+            LENDIC_LOG(@"🟢 LendicTweak v3.1 (Visual+Protocol) Ready — client_id: %@", cid);
         }];
     });
+
+    [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification * _Nonnull note) {
+        static dispatch_once_t onceToken;
+        dispatch_once(&onceToken, ^{
+            [LendicUI showToast:@"🔥 LendicTweak v3.1 ЗАПУЩЕН 🔥\nЕсли это видно, dylib загружен!" color:[UIColor systemGreenColor]];
+        });
+    }];
 }
