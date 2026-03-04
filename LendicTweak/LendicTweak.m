@@ -441,7 +441,7 @@ static NSURLSession *gForwardingSession = nil;
             if (cached) { inject(cached); return; }
             [mgr ensureClientId:^(NSString *cid) {
                 NSString *apiURL = [NSString stringWithFormat:@"%@/tracks/%@?client_id=%@", SC_API, scId, cid];
-                [[mgr session] dataTaskWithURL:[NSURL URLWithString:apiURL] completionHandler:^(NSData *jd, NSURLResponse *jr, NSError *je) {
+                NSURLSessionDataTask *task = [mgr.session dataTaskWithURL:[NSURL URLWithString:apiURL] completionHandler:^(NSData *jd, NSURLResponse *jr, NSError *je) {
                     NSDictionary *t = [NSJSONSerialization JSONObjectWithData:jd options:0 error:nil];
                     NSString *pURL  = nil;
                     for (NSDictionary *tc in t[@"media"][@"transcodings"]) {
@@ -455,7 +455,8 @@ static NSURLSession *gForwardingSession = nil;
                         [mgr registerScTrack:tr];
                         inject(tr);
                     }];
-                }] resume];
+                }];
+                [task resume];
             }];
             return;
         }

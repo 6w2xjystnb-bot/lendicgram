@@ -19,6 +19,8 @@
 
 #define LENDIC_LOG(fmt, ...) NSLog(@"[LendicTweak] " fmt, ##__VA_ARGS__)
 
+NS_ASSUME_NONNULL_BEGIN
+
 // A resolved SC track with a direct playable URL
 @interface LendicSCTrack : NSObject
 @property (nonatomic, copy)   NSString *scId;
@@ -56,3 +58,5 @@
 // Ensure client_id is valid (refresh if needed)
 - (void)ensureClientId:(void(^)(NSString *))completion;
 @end
+
+NS_ASSUME_NONNULL_END
