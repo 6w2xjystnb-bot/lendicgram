@@ -65,6 +65,26 @@
 @end
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  GLOBAL CACHES & HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+
+static NSMutableDictionary<NSString *, NSDictionary *> *gMeta;
+static dispatch_queue_t gMetaQ;
+
+static BOOL isYandex(NSURL *u) { return u.host && [u.host containsString:@"music.yandex"]; }
+static BOOL isDlInfo(NSURL *u) { return isYandex(u) && [u.path containsString:@"download-info"]; }
+static BOOL isSupp(NSURL *u)   { return isYandex(u) && ([u.path containsString:@"/tracks/"] || [u.path containsString:@"/track/"]); }
+static BOOL isSearch(NSURL *u) { return isYandex(u) && [u.path containsString:@"/search"]; }
+
+static NSString *yandexTrackId(NSURL *url) {
+    NSString *p = url.path ?: @"";
+    NSRegularExpression *re = [NSRegularExpression regularExpressionWithPattern:@"/tracks?/(\\d+)" options:0 error:nil];
+    NSTextCheckingResult *m = [re firstMatchInString:p options:0 range:NSMakeRange(0, p.length)];
+    if (m && m.numberOfRanges > 1) return [p substringWithRange:[m rangeAtIndex:1]];
+    return nil;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  LendicSCTrack
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -370,7 +390,7 @@ static NSString *yandexTrackId(NSURL *url) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  NSURLPROTOCOL PROXY INTERCEPTOR
+//  NSURLPROTOCOL PROXY INTERCEPTOR (Fallback)
 // ═══════════════════════════════════════════════════════════════════════════
 
 static NSURLSession *gForwardingSession = nil;
@@ -579,7 +599,267 @@ static NSURLSession *gForwardingSession = nil;
 @end
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  NSURLSessionConfiguration Swizzling (Alamofire/AFNetworking support)
+//  NSURLSessionDataDelegate Swizzling (The "Iron Net" for Alamofire)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Store original implementations dynamically
+static NSMutableDictionary *orig_didReceiveData_IMPs;
+static NSMutableDictionary *orig_didCompleteWithError_IMPs;
+
+// A buffer to hold accumulated data for tasks we are intercepting
+static NSMutableDictionary<NSNumber *, NSMutableData *> *lendic_taskDataBuffers;
+static dispatch_queue_t lendic_dataQ;
+
+static void lendic_swizzled_didReceiveData(id self, SEL _cmd, NSURLSession *session, NSURLSessionDataTask *dataTask, NSData *data) {
+    NSURL *url = dataTask.currentRequest.URL;
+    if (isSupp(url) || isDlInfo(url) || isSearch(url)) {
+        dispatch_sync(lendic_dataQ, ^{
+            NSNumber *taskId = @(dataTask.taskIdentifier);
+            NSMutableData *buf = lendic_taskDataBuffers[taskId];
+            if (!buf) {
+                buf = [NSMutableData data];
+                lendic_taskDataBuffers[taskId] = buf;
+            }
+            [buf appendData:data];
+        });
+        // We DO NOT call the original here! We swallow the data so the app waits.
+        return;
+    }
+    
+    // For all other URLs, just call original
+    IMP orig = [orig_didReceiveData_IMPs[NSStringFromClass([self class])] pointerValue];
+    if (orig) {
+        ((void(*)(id,SEL,NSURLSession*,NSURLSessionDataTask*,NSData*))orig)(self, _cmd, session, dataTask, data);
+    }
+}
+
+static void lendic_swizzled_didCompleteWithError(id self, SEL _cmd, NSURLSession *session, NSURLSessionTask *task, NSError *error) {
+    NSURL *url = task.currentRequest.URL;
+    if ((isSupp(url) || isDlInfo(url) || isSearch(url)) && [task isKindOfClass:[NSURLSessionDataTask class]]) {
+        NSURLSessionDataTask *dataTask = (NSURLSessionDataTask *)task;
+        __block NSData *accumulatedData = nil;
+        dispatch_sync(lendic_dataQ, ^{
+            NSNumber *taskId = @(task.taskIdentifier);
+            accumulatedData = [lendic_taskDataBuffers[taskId] copy];
+            [lendic_taskDataBuffers removeObjectForKey:taskId];
+        });
+        
+        IMP origDataIMP = [orig_didReceiveData_IMPs[NSStringFromClass([self class])] pointerValue];
+        IMP origCompIMP = [orig_didCompleteWithError_IMPs[NSStringFromClass([self class])] pointerValue];
+        
+        if (error || !accumulatedData) {
+            // Pass through errors or empty
+            if (accumulatedData && origDataIMP) {
+                ((void(*)(id,SEL,NSURLSession*,NSURLSessionDataTask*,NSData*))origDataIMP)(self, NSSelectorFromString(@"URLSession:dataTask:didReceiveData:"), session, dataTask, accumulatedData);
+            }
+            if (origCompIMP) {
+                ((void(*)(id,SEL,NSURLSession*,NSURLSessionTask*,NSError*))origCompIMP)(self, _cmd, session, task, error);
+            }
+            return;
+        }
+
+        // --- Process the accumulated data just like NSURLProtocol did ---
+        NSInteger code = [(NSHTTPURLResponse *)task.response statusCode];
+        
+        // 1. Supplement
+        if (isSupp(url)) {
+            NSString *tid = yandexTrackId(url);
+            if (tid) {
+                id obj = [NSJSONSerialization JSONObjectWithData:accumulatedData options:0 error:nil];
+                NSDictionary *td = nil;
+                if ([obj isKindOfClass:[NSDictionary class]]) {
+                    id inner = obj[@"track"] ?: obj[@"result"];
+                    if ([inner isKindOfClass:[NSArray class]]) td = ((NSArray *)inner).firstObject;
+                    else if ([inner isKindOfClass:[NSDictionary class]]) td = inner;
+                    else td = obj;
+                } else if ([obj isKindOfClass:[NSArray class]]) {
+                    td = ((NSArray *)obj).firstObject;
+                }
+                NSString *t = td[@"title"];
+                NSString *a = ((NSArray *)td[@"artists"]).firstObject[@"name"] ?: @"";
+                if (t.length) {
+                    dispatch_async(gMetaQ, ^{ gMeta[tid] = @{@"title":t, @"artist":a}; });
+                    LENDIC_LOG(@"Mapped #%@: %@ – %@", tid, a, t);
+                    [[LendicManager shared] resolveForTitle:t artist:a completion:nil]; // pre-warm
+                }
+            }
+            // Pass through
+            if (origDataIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionDataTask*,NSData*))origDataIMP)(self, NSSelectorFromString(@"URLSession:dataTask:didReceiveData:"), session, dataTask, accumulatedData);
+            if (origCompIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionTask*,NSError*))origCompIMP)(self, _cmd, session, task, nil);
+            return;
+        }
+        
+        // 2. Download Info
+        if (isDlInfo(url)) {
+            NSString *tid = yandexTrackId(url);
+            LendicManager *mgr = [LendicManager shared];
+            long long numId = tid ? [tid longLongValue] : 0;
+            NSString *scId  = (numId > 9000000000LL) ? [mgr scIdForFakeYandexId:numId] : nil;
+            
+            void(^inject)(LendicSCTrack *) = ^(LendicSCTrack *track) {
+                NSData *fake = [NSJSONSerialization dataWithJSONObject:[track asYandexDownloadInfo] options:0 error:nil];
+                if (origDataIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionDataTask*,NSData*))origDataIMP)(self, NSSelectorFromString(@"URLSession:dataTask:didReceiveData:"), session, dataTask, fake);
+                if (origCompIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionTask*,NSError*))origCompIMP)(self, _cmd, session, task, nil);
+                [LendicUI showToast:[NSString stringWithFormat:@"🎵 Playing SC:\n%@", track.title] color:[UIColor systemBlueColor]];
+            };
+
+            if (scId) {
+                LendicSCTrack *cached = [mgr trackByScId:scId];
+                if (cached) { inject(cached); return; }
+                [mgr ensureClientId:^(NSString *cid) {
+                    NSString *apiURL = [NSString stringWithFormat:@"%@/tracks/%@?client_id=%@", SC_API, scId, cid];
+                    NSURLSessionDataTask *scTask = [mgr.session dataTaskWithURL:[NSURL URLWithString:apiURL] completionHandler:^(NSData *jd, NSURLResponse *jr, NSError *je) {
+                        NSDictionary *tj = [NSJSONSerialization JSONObjectWithData:jd options:0 error:nil];
+                        NSString *pURL  = nil;
+                        for (NSDictionary *tc in tj[@"media"][@"transcodings"]) {
+                            if ([tc[@"format"][@"protocol"] isEqualToString:@"progressive"]) { pURL = tc[@"url"]; break; }
+                        }
+                        if (!pURL) {
+                            if (origDataIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionDataTask*,NSData*))origDataIMP)(self, NSSelectorFromString(@"URLSession:dataTask:didReceiveData:"), session, dataTask, accumulatedData);
+                            if (origCompIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionTask*,NSError*))origCompIMP)(self, _cmd, session, task, nil);
+                            return;
+                        }
+                        [mgr resolveTranscoding:pURL clientId:cid completion:^(NSURL *cdnURL) {
+                            if (!cdnURL) {
+                                if (origDataIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionDataTask*,NSData*))origDataIMP)(self, NSSelectorFromString(@"URLSession:dataTask:didReceiveData:"), session, dataTask, accumulatedData);
+                                if (origCompIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionTask*,NSError*))origCompIMP)(self, _cmd, session, task, nil);
+                                return;
+                            }
+                            LendicSCTrack *tr = [LendicSCTrack new];
+                            tr.scId = scId; tr.streamURL = cdnURL; tr.title = tj[@"title"] ?: @""; tr.artist = tj[@"user"][@"username"] ?: @"";
+                            [mgr registerScTrack:tr];
+                            inject(tr);
+                        }];
+                    }];
+                    [scTask resume];
+                }];
+                return;
+            }
+
+            // Real Yandex Track Fallback
+            __block NSDictionary *meta = nil;
+            dispatch_sync(gMetaQ, ^{ meta = tid ? gMeta[tid] : nil; });
+            NSString *title  = meta[@"title"]  ?: @"";
+            NSString *artist = meta[@"artist"] ?: @"";
+            if (!title.length) {
+                if (origDataIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionDataTask*,NSData*))origDataIMP)(self, NSSelectorFromString(@"URLSession:dataTask:didReceiveData:"), session, dataTask, accumulatedData);
+                if (origCompIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionTask*,NSError*))origCompIMP)(self, _cmd, session, task, nil);
+                return;
+            }
+
+            [mgr resolveForTitle:title artist:artist completion:^(LendicSCTrack *track) {
+                if (track) {
+                    inject(track);
+                } else {
+                    if (origDataIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionDataTask*,NSData*))origDataIMP)(self, NSSelectorFromString(@"URLSession:dataTask:didReceiveData:"), session, dataTask, accumulatedData);
+                    if (origCompIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionTask*,NSError*))origCompIMP)(self, _cmd, session, task, nil);
+                }
+            }];
+            return; // wait
+        }
+        
+        // 3. Search Info
+        if (isSearch(url)) {
+            NSURLComponents *c = [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:NO];
+            NSString *q = nil;
+            for (NSURLQueryItem *qi in c.queryItems) { if ([qi.name isEqualToString:@"text"] || [qi.name isEqualToString:@"query"]) q = qi.value; }
+            
+            if (!q.length) {
+                if (origDataIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionDataTask*,NSData*))origDataIMP)(self, NSSelectorFromString(@"URLSession:dataTask:didReceiveData:"), session, dataTask, accumulatedData);
+                if (origCompIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionTask*,NSError*))origCompIMP)(self, _cmd, session, task, nil);
+                return;
+            }
+            
+            id json = [NSJSONSerialization JSONObjectWithData:accumulatedData options:0 error:nil];
+            if (![json isKindOfClass:[NSDictionary class]]) {
+                if (origDataIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionDataTask*,NSData*))origDataIMP)(self, NSSelectorFromString(@"URLSession:dataTask:didReceiveData:"), session, dataTask, accumulatedData);
+                if (origCompIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionTask*,NSError*))origCompIMP)(self, _cmd, session, task, nil);
+                return;
+            }
+            
+            NSMutableSet *yaTitles = [NSMutableSet new];
+            NSArray *yaResults = json[@"result"][@"tracks"][@"results"] ?: json[@"tracks"][@"results"] ?: json[@"result"][@"results"] ?: @[];
+            for (NSDictionary *t in yaResults) {
+                NSString *yt = [t[@"title"] lowercaseString];
+                if (yt.length) [yaTitles addObject:yt];
+            }
+            
+            [[LendicManager shared] searchSC:q limit:15 completion:^(NSArray<LendicSCTrack *> *scTracks) {
+                NSMutableArray *novel = [NSMutableArray new];
+                for (LendicSCTrack *t in scTracks) {
+                    BOOL dup = NO;
+                    for (NSString *ya in yaTitles) {
+                        if ([ya containsString:t.title.lowercaseString] || [t.title.lowercaseString containsString:ya]) { dup = YES; break; }
+                    }
+                    if (!dup) [novel addObject:[t asYandexTrackDict]];
+                }
+                if (!novel.count) {
+                    if (origDataIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionDataTask*,NSData*))origDataIMP)(self, NSSelectorFromString(@"URLSession:dataTask:didReceiveData:"), session, dataTask, accumulatedData);
+                    if (origCompIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionTask*,NSError*))origCompIMP)(self, _cmd, session, task, nil);
+                    return;
+                }
+                
+                NSMutableDictionary *mutJson = [json mutableCopy];
+                NSMutableDictionary *result = [[mutJson[@"result"] mutableCopy] ?: [NSMutableDictionary new] copy];
+                NSMutableDictionary *tracks = [[result[@"tracks"] mutableCopy] ?: [NSMutableDictionary new] copy];
+                NSMutableArray *results     = [[tracks[@"results"] mutableCopy] ?: [NSMutableArray new] copy];
+                [results addObjectsFromArray:novel];
+                tracks[@"results"]  = results;
+                result[@"tracks"]   = tracks;
+                mutJson[@"result"]  = result;
+                
+                NSData *newData = [NSJSONSerialization dataWithJSONObject:mutJson options:0 error:nil];
+                if (origDataIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionDataTask*,NSData*))origDataIMP)(self, NSSelectorFromString(@"URLSession:dataTask:didReceiveData:"), session, dataTask, newData);
+                if (origCompIMP) ((void(*)(id,SEL,NSURLSession*,NSURLSessionTask*,NSError*))origCompIMP)(self, _cmd, session, task, nil);
+                
+                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                    [LendicUI showToast:[NSString stringWithFormat:@"🔎 Injected %lu SC Tracks", (unsigned long)novel.count] color:[UIColor systemPurpleColor]];
+                });
+            }];
+            return; // wait for async search
+        }
+    }
+    
+    // Pass through normal
+    IMP orig = [orig_didCompleteWithError_IMPs[NSStringFromClass([self class])] pointerValue];
+    if (orig) {
+        ((void(*)(id,SEL,NSURLSession*,NSURLSessionTask*,NSError*))orig)(self, _cmd, session, task, error);
+    }
+}
+
+static void hookDelegateClass(Class cls) {
+    if (!cls) return;
+    NSString *clsName = NSStringFromClass(cls);
+    if (!clsName || [clsName hasPrefix:@"__"] || [clsName hasPrefix:@"_UI"]) return; // skip internal
+    if (orig_didReceiveData_IMPs[clsName]) return; // already hooked
+    
+    SEL selData = NSSelectorFromString(@"URLSession:dataTask:didReceiveData:");
+    SEL selComp = NSSelectorFromString(@"URLSession:task:didCompleteWithError:");
+    
+    Method mData = class_getInstanceMethod(cls, selData);
+    Method mComp = class_getInstanceMethod(cls, selComp);
+    
+    if (mData && mComp) {
+        orig_didReceiveData_IMPs[clsName] = [NSValue valueWithPointer:method_getImplementation(mData)];
+        method_setImplementation(mData, (IMP)lendic_swizzled_didReceiveData);
+        
+        orig_didCompleteWithError_IMPs[clsName] = [NSValue valueWithPointer:method_getImplementation(mComp)];
+        method_setImplementation(mComp, (IMP)lendic_swizzled_didCompleteWithError);
+        LENDIC_LOG(@"🔗 Hooked NSURLSessionDelegate methods on class: %@", clsName);
+    }
+}
+
+// Hook session creation to capture the delegate classes dynamically
+static IMP gOrigSessionWithConfigDelegateQueue;
+static NSURLSession *lendic_sessionWithConfigDelegateQueue(id self, SEL _cmd, NSURLSessionConfiguration *config, id<NSURLSessionDelegate> delegate, NSOperationQueue *queue) {
+    if (delegate) {
+        hookDelegateClass([delegate class]);
+    }
+    return ((NSURLSession *(*)(id,SEL,NSURLSessionConfiguration*,id,NSOperationQueue*))gOrigSessionWithConfigDelegateQueue)(self, _cmd, config, delegate, queue);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  NSURLSessionConfiguration Swizzling (Alamofire fallback)
 // ═══════════════════════════════════════════════════════════════════════════
 
 static IMP gOrigDefaultConfig;
@@ -605,32 +885,46 @@ static void LendicSetup(void) {
     gMeta  = [NSMutableDictionary new];
     gMetaQ = dispatch_queue_create("lendic.meta", DISPATCH_QUEUE_SERIAL);
 
+    // 0. Setup variables
+    lendic_taskDataBuffers = [NSMutableDictionary new];
+    lendic_dataQ = dispatch_queue_create("lendic.intercept.data", DISPATCH_QUEUE_SERIAL);
+    orig_didReceiveData_IMPs = [NSMutableDictionary new];
+    orig_didCompleteWithError_IMPs = [NSMutableDictionary new];
+
     // 1. Register for [NSURLSession sharedSession]
     [NSURLProtocol registerClass:[LendicURLProtocol class]];
 
-    // 2. Swizzle configurations for custom sessions (like Alamofire)
-    Class cls = NSClassFromString(@"NSURLSessionConfiguration");
-    Method m1 = class_getClassMethod(cls, @selector(defaultSessionConfiguration));
+    // 2. Swizzle configurations for custom sessions
+    Class configCls = NSClassFromString(@"NSURLSessionConfiguration");
+    Method m1 = class_getClassMethod(configCls, @selector(defaultSessionConfiguration));
     if (m1) {
         gOrigDefaultConfig = method_getImplementation(m1);
         method_setImplementation(m1, (IMP)lendic_defaultSessionConfiguration);
     }
-    Method m2 = class_getClassMethod(cls, @selector(ephemeralSessionConfiguration));
+    Method m2 = class_getClassMethod(configCls, @selector(ephemeralSessionConfiguration));
     if (m2) {
         gOrigEphemeralConfig = method_getImplementation(m2);
         method_setImplementation(m2, (IMP)lendic_ephemeralSessionConfiguration);
     }
 
+    // 3. Swizzle session creation to hook delegates (catches Alamofire / robust apps)
+    Class sessionCls = NSClassFromString(@"NSURLSession");
+    Method m3 = class_getClassMethod(sessionCls, @selector(sessionWithConfiguration:delegate:delegateQueue:));
+    if (m3) {
+        gOrigSessionWithConfigDelegateQueue = method_getImplementation(m3);
+        method_setImplementation(m3, (IMP)lendic_sessionWithConfigDelegateQueue);
+    }
+
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         [[LendicManager shared] ensureClientId:^(NSString *cid) {
-            LENDIC_LOG(@"🟢 LendicTweak v3.1 (Visual+Protocol) Ready — client_id: %@", cid);
+            LENDIC_LOG(@"🟢 LendicTweak v4 (Delegates+Protocol) Ready — client_id: %@", cid);
         }];
     });
 
     [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:[NSOperationQueue mainQueue] usingBlock:^(NSNotification * _Nonnull note) {
         static dispatch_once_t onceToken;
         dispatch_once(&onceToken, ^{
-            [LendicUI showToast:@"🔥 LendicTweak v3.1 ЗАПУЩЕН 🔥\nЕсли это видно, dylib загружен!" color:[UIColor systemGreenColor]];
+            [LendicUI showToast:@"🔥 LendicTweak v4 ЗАПУЩЕН 🔥\n(Delegate Net Active)" color:[UIColor systemGreenColor]];
         });
     }];
 }
