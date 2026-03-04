@@ -391,6 +391,9 @@ static NSString *yandexTrackId(NSURL *url) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  NSURLPROTOCOL PROXY INTERCEPTOR (Fallback)
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  NSURLPROTOCOL PROXY INTERCEPTOR (Fallback)
 // ═══════════════════════════════════════════════════════════════════════════
 
 static NSURLSession *gForwardingSession = nil;
@@ -406,10 +409,6 @@ static NSURLSession *gForwardingSession = nil;
     if ([NSURLProtocol propertyForKey:@"LendicProxied" inRequest:request]) return NO;
     if (isSupp(url) || isDlInfo(url) || isSearch(url)) return YES;
     return NO;
-}
-
-+ (BOOL)canInitWithTask:(NSURLSessionTask *)task {
-    return [self canInitWithRequest:task.currentRequest];
 }
 
 + (NSURLRequest *)canonicalRequestForRequest:(NSURLRequest *)request {
@@ -475,7 +474,7 @@ static NSURLSession *gForwardingSession = nil;
             if (t.length) {
                 dispatch_async(gMetaQ, ^{ gMeta[tid] = @{@"title":t, @"artist":a}; });
                 LENDIC_LOG(@"Mapped #%@: %@ – %@", tid, a, t);
-                [[LendicManager shared] resolveForTitle:t artist:a completion:nil]; // pre-warm
+                [[LendicManager shared] resolveForTitle:t artist:a completion:^(LendicSCTrack *tr){}]; // pre-warm
             }
         }
         [self finishWithData:data response:response statusCode:code];
@@ -680,7 +679,7 @@ static void lendic_swizzled_didCompleteWithError(id self, SEL _cmd, NSURLSession
                 if (t.length) {
                     dispatch_async(gMetaQ, ^{ gMeta[tid] = @{@"title":t, @"artist":a}; });
                     LENDIC_LOG(@"Mapped #%@: %@ – %@", tid, a, t);
-                    [[LendicManager shared] resolveForTitle:t artist:a completion:nil]; // pre-warm
+                    [[LendicManager shared] resolveForTitle:t artist:a completion:^(LendicSCTrack *tr){}]; // pre-warm
                 }
             }
             // Pass through
