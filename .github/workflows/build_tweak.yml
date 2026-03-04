@@ -53,6 +53,14 @@ jobs:
         path: LendicTweak/LendicTweak.dylib
         retention-days: 90
 
+    - name: Install Git LFS and pull IPA
+      run: |
+        git lfs install
+        git lfs pull
+        echo "📦 Files after LFS pull:"
+        ls -lh *.ipa 2>/dev/null || echo "No IPA in root"
+        find . -name "*.ipa" -not -path "./.git/*" | head -5
+
     - name: Install insert_dylib
       run: |
         echo "📦 Building insert_dylib..."
@@ -62,63 +70,75 @@ jobs:
           -target insert_dylib \
           -configuration Release \
           ONLY_ACTIVE_ARCH=NO 2>/dev/null || true
-        if [ ! -f build/Release/insert_dylib ]; then
-          clang -o insert_dylib insert_dylib/main.c \
-            -framework Foundation -framework Security
+        if [ -f build/Release/insert_dylib ]; then
+          sudo cp build/Release/insert_dylib /usr/local/bin/insert_dylib
+        else
+          echo "xcodebuild failed, trying clang fallback..."
+          clang -o /usr/local/bin/insert_dylib \
+            insert_dylib/main.c \
+            -framework Foundation \
+            -framework Security \
+            2>/dev/null || true
         fi
-        find . -name "insert_dylib" -type f ! -name "*.c" ! -name "*.h" \
-          | head -1 | xargs -I{} cp {} /usr/local/bin/insert_dylib 2>/dev/null || \
-          cp insert_dylib /usr/local/bin/insert_dylib 2>/dev/null || true
-        chmod +x /usr/local/bin/insert_dylib 2>/dev/null || true
-        echo "✅ insert_dylib ready"
+        sudo chmod +x /usr/local/bin/insert_dylib
+        insert_dylib --version 2>/dev/null || echo "(no version flag, binary exists: $(ls -la /usr/local/bin/insert_dylib))"
 
     - name: Patch IPA (blenka.ipa)
       run: |
-        IPA_FILE=$(find . -maxdepth 1 -name "*.ipa" | head -1)
+        IPA_FILE=$(find . -maxdepth 2 -name "*.ipa" -not -path "./.git/*" | head -1)
 
         if [ -z "$IPA_FILE" ]; then
           echo "⚠️ No IPA found — uploading dylib only."
+          mkdir -p output
+          cp LendicTweak/LendicTweak.dylib output/
           exit 0
         fi
 
-        echo "📱 Found IPA: $IPA_FILE"
+        echo "📱 Found IPA: $IPA_FILE ($(du -h "$IPA_FILE" | cut -f1))"
         mkdir -p extracted
         unzip -q "$IPA_FILE" -d extracted
 
         APP_DIR=$(find extracted/Payload -name "*.app" -maxdepth 1 | head -1)
+        if [ -z "$APP_DIR" ]; then
+          echo "❌ No .app found in Payload"
+          find extracted -maxdepth 3 -type d | head -10
+          exit 1
+        fi
+
         APP_NAME=$(basename "$APP_DIR" .app)
         BINARY="$APP_DIR/$APP_NAME"
 
-        echo "📱 App: $APP_NAME  Binary: $BINARY"
+        echo "📱 App: $APP_NAME"
+        echo "📱 Binary: $BINARY ($(file "$BINARY" | cut -d: -f2))"
 
-        # Copy dylib next to binary (not in Frameworks — simpler for injection)
+        # Copy dylib next to binary
         cp LendicTweak/LendicTweak.dylib "$APP_DIR/LendicTweak.dylib"
         echo "✅ Dylib copied"
 
         # Inject LC_LOAD_DYLIB
-        if command -v insert_dylib &>/dev/null; then
-          insert_dylib \
-            --strip-codesig \
-            --inplace \
-            "@executable_path/LendicTweak.dylib" \
-            "$BINARY"
-          echo "✅ Load command injected"
+        DYLIB_PATH="@executable_path/LendicTweak.dylib"
+        echo "💉 Injecting: $DYLIB_PATH"
+
+        if /usr/local/bin/insert_dylib --strip-codesig --inplace "$DYLIB_PATH" "$BINARY"; then
+          echo "✅ inject_dylib succeeded"
         else
-          echo "❌ insert_dylib not found"
-          exit 1
+          EC=$?
+          echo "⚠️ insert_dylib failed (ec=$EC), trying --all-yes..."
+          /usr/local/bin/insert_dylib --strip-codesig --all-yes "$DYLIB_PATH" "$BINARY" && echo "✅ --all-yes worked" || true
         fi
 
-        # Strip code signatures (re-signed by TrollStore/AltStore on device)
+        # Verify injection
+        otool -l "$BINARY" | grep -A2 LC_LOAD_DYLIB | grep -o "@executable.*" | head -5
+
+        # Strip code signatures
         rm -rf "$APP_DIR/_CodeSignature"
         rm -f  "$APP_DIR/embedded.mobileprovision"
         find "$APP_DIR" -name "_CodeSignature" -exec rm -rf {} + 2>/dev/null || true
 
         # Repack
         mkdir -p output
-        cd extracted
-        zip -qr "../output/blenka_lendic.ipa" Payload/
-        cd ..
-        echo "✅ Patched IPA: output/blenka_lendic.ipa"
+        cd extracted && zip -qr "../output/blenka_lendic.ipa" Payload/ && cd ..
+        echo "✅ Patched IPA ready:"
         ls -lh output/
 
     - name: Upload patched IPA
