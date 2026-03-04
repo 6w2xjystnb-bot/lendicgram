@@ -370,29 +370,6 @@ static NSString *yandexTrackId(NSURL *url) {
 @end
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  GLOBAL CACHES
-// ═══════════════════════════════════════════════════════════════════════════
-
-static NSMutableDictionary<NSString *, NSDictionary *> *gMeta;
-static dispatch_queue_t gMetaQ;
-
-static BOOL isYandex(NSURL *u) { return u.host && [u.host containsString:@"music.yandex"]; }
-static BOOL isDlInfo(NSURL *u) { return isYandex(u) && [u.path containsString:@"download-info"]; }
-static BOOL isSupp(NSURL *u)   { return isYandex(u) && ([u.path containsString:@"/tracks/"] || [u.path containsString:@"/track/"]); }
-static BOOL isSearch(NSURL *u) { return isYandex(u) && [u.path containsString:@"/search"]; }
-
-static NSString *yandexTrackId(NSURL *url) {
-    NSString *p = url.path ?: @"";
-    NSRegularExpression *re = [NSRegularExpression regularExpressionWithPattern:@"/tracks?/(\\d+)" options:0 error:nil];
-    NSTextCheckingResult *m = [re firstMatchInString:p options:0 range:NSMakeRange(0, p.length)];
-    if (m && m.numberOfRanges > 1) return [p substringWithRange:[m rangeAtIndex:1]];
-    return nil;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-//  NSURLPROTOCOL PROXY INTERCEPTOR (Fallback)
-
-// ═══════════════════════════════════════════════════════════════════════════
 //  NSURLPROTOCOL PROXY INTERCEPTOR (Fallback)
 // ═══════════════════════════════════════════════════════════════════════════
 
