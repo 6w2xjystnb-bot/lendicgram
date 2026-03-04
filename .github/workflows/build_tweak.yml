@@ -1,0 +1,130 @@
+name: Build LendicTweak (Maple/Yandex Music)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Show Xcode version
+      run: |
+        xcodebuild -version
+        xcrun --sdk iphoneos --show-sdk-path
+
+    - name: Compile LendicTweak.dylib
+      run: |
+        echo "🔨 Compiling LendicTweak.dylib..."
+        mkdir -p LendicTweak
+        xcrun -sdk iphoneos clang \
+          -shared \
+          -o LendicTweak/LendicTweak.dylib \
+          LendicTweak/LendicTweak.m \
+          -framework Foundation \
+          -framework AVFoundation \
+          -framework UIKit \
+          -framework Security \
+          -target arm64-apple-ios10.0 \
+          -fobjc-arc \
+          -O2 \
+          -Wno-unused-variable \
+          -Wno-deprecated-declarations
+        echo "✅ Compiled!"
+        file LendicTweak/LendicTweak.dylib
+        ls -lh LendicTweak/LendicTweak.dylib
+
+    - name: Fix dylib install name
+      run: |
+        install_name_tool \
+          -id "@executable_path/LendicTweak.dylib" \
+          LendicTweak/LendicTweak.dylib
+        echo "✅ Install name fixed"
+
+    - name: Upload dylib (standalone)
+      uses: actions/upload-artifact@v4
+      with:
+        name: LendicTweak.dylib
+        path: LendicTweak/LendicTweak.dylib
+        retention-days: 90
+
+    - name: Install insert_dylib
+      run: |
+        echo "📦 Building insert_dylib..."
+        git clone https://github.com/tyilo/insert_dylib.git /tmp/insert_dylib
+        cd /tmp/insert_dylib
+        xcodebuild -project insert_dylib.xcodeproj \
+          -target insert_dylib \
+          -configuration Release \
+          ONLY_ACTIVE_ARCH=NO 2>/dev/null || true
+        if [ ! -f build/Release/insert_dylib ]; then
+          clang -o insert_dylib insert_dylib/main.c \
+            -framework Foundation -framework Security
+        fi
+        find . -name "insert_dylib" -type f ! -name "*.c" ! -name "*.h" \
+          | head -1 | xargs -I{} cp {} /usr/local/bin/insert_dylib 2>/dev/null || \
+          cp insert_dylib /usr/local/bin/insert_dylib 2>/dev/null || true
+        chmod +x /usr/local/bin/insert_dylib 2>/dev/null || true
+        echo "✅ insert_dylib ready"
+
+    - name: Patch IPA (blenka.ipa)
+      run: |
+        IPA_FILE=$(find . -maxdepth 1 -name "*.ipa" | head -1)
+
+        if [ -z "$IPA_FILE" ]; then
+          echo "⚠️ No IPA found — uploading dylib only."
+          exit 0
+        fi
+
+        echo "📱 Found IPA: $IPA_FILE"
+        mkdir -p extracted
+        unzip -q "$IPA_FILE" -d extracted
+
+        APP_DIR=$(find extracted/Payload -name "*.app" -maxdepth 1 | head -1)
+        APP_NAME=$(basename "$APP_DIR" .app)
+        BINARY="$APP_DIR/$APP_NAME"
+
+        echo "📱 App: $APP_NAME  Binary: $BINARY"
+
+        # Copy dylib next to binary (not in Frameworks — simpler for injection)
+        cp LendicTweak/LendicTweak.dylib "$APP_DIR/LendicTweak.dylib"
+        echo "✅ Dylib copied"
+
+        # Inject LC_LOAD_DYLIB
+        if command -v insert_dylib &>/dev/null; then
+          insert_dylib \
+            --strip-codesig \
+            --inplace \
+            "@executable_path/LendicTweak.dylib" \
+            "$BINARY"
+          echo "✅ Load command injected"
+        else
+          echo "❌ insert_dylib not found"
+          exit 1
+        fi
+
+        # Strip code signatures (re-signed by TrollStore/AltStore on device)
+        rm -rf "$APP_DIR/_CodeSignature"
+        rm -f  "$APP_DIR/embedded.mobileprovision"
+        find "$APP_DIR" -name "_CodeSignature" -exec rm -rf {} + 2>/dev/null || true
+
+        # Repack
+        mkdir -p output
+        cd extracted
+        zip -qr "../output/blenka_lendic.ipa" Payload/
+        cd ..
+        echo "✅ Patched IPA: output/blenka_lendic.ipa"
+        ls -lh output/
+
+    - name: Upload patched IPA
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: blenka_lendic
+        path: output/blenka_lendic.ipa
+        retention-days: 90

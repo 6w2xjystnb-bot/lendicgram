@@ -1,0 +1,23 @@
+# .gitignore for Y.Lendic / LendicTweak
+
+# Build artifacts
+LendicTweak/.theos/
+LendicTweak/packages/
+LendicTweak/*.deb
+*.o
+*.d
+
+# Node
+sc/node_modules/
+sc/database.json
+sc/reports.log
+sc/.venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IPA files — exclude original (too large for GitHub free)
+# blenka.ipa
+# Only keep the patched one output by CI
+blenka_patched.ipa
