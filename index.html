@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>ЕГЭ Plan — Lendic</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Manrope:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+--bg:#0a0a12;--surface:#12121e;--card:#1a1a2e;--border:#2a2a44;
+--text:#e8e8f0;--dim:#7a7a9a;--accent:#7c5cff;--accent2:#5c8cff;
+--rus:#9b59b6;--math:#3498db;--cs:#2ecc71;
+--danger:#e74c3c;--warn:#f39c12;--ok:#2ecc71;
+}
+html,body{background:var(--bg);color:var(--text);font-family:'Manrope',sans-serif;
+overflow-x:hidden;min-height:100vh;min-height:100dvh}
+
+.app{max-width:480px;margin:0 auto;padding-bottom:80px}
+
+/* Top bar */
+.topbar{position:sticky;top:0;z-index:100;background:rgba(10,10,18,.85);
+backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+border-bottom:1px solid var(--border);padding:12px 16px}
+.topbar h1{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;
+letter-spacing:2px;background:linear-gradient(135deg,var(--accent),var(--cs));
+-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.topbar .sub{font-size:11px;color:var(--dim);margin-top:2px;font-weight:400}
+
+/* Bottom nav */
+.nav{position:fixed;bottom:0;left:0;right:0;z-index:100;
+background:rgba(10,10,18,.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+border-top:1px solid var(--border);display:flex;max-width:480px;margin:0 auto}
+.nav button{flex:1;padding:10px 4px 12px;background:none;border:none;color:var(--dim);
+font-size:10px;font-family:'Manrope',sans-serif;font-weight:600;cursor:pointer;
+display:flex;flex-direction:column;align-items:center;gap:3px;transition:.2s}
+.nav button.active{color:var(--accent)}
+.nav button .ico{font-size:18px;line-height:1}
+
+/* Cards */
+.section{padding:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;
+padding:16px;margin-bottom:12px;transition:transform .15s}
+
+/* Countdown cards */
+.exam-card{display:flex;align-items:center;gap:14px;padding:14px 16px}
+.exam-card .days{font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:700;
+min-width:56px;text-align:center;line-height:1}
+.exam-card .days span{display:block;font-size:10px;font-weight:400;color:var(--dim);margin-top:2px}
+.exam-card .info{flex:1}
+.exam-card .info .name{font-weight:700;font-size:14px}
+.exam-card .info .date{font-size:12px;color:var(--dim);margin-top:2px}
+.exam-card .info .score{font-size:11px;margin-top:4px;font-family:'JetBrains Mono',monospace}
+.exam-card.rus{border-left:3px solid var(--rus)}
+.exam-card.rus .days{color:var(--rus)}
+.exam-card.math{border-left:3px solid var(--math)}
+.exam-card.math .days{color:var(--math)}
+.exam-card.cs{border-left:3px solid var(--cs)}
+.exam-card.cs .days{color:var(--cs)}
+
+/* Progress bar */
+.pbar{height:4px;background:var(--border);border-radius:2px;margin-top:6px;overflow:hidden}
+.pbar .fill{height:100%;border-radius:2px;transition:width .5s}
+
+/* Phase badge */
+.phase-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;
+font-weight:700;font-family:'JetBrains Mono',monospace}
+
+/* Schedule */
+.day-card{padding:14px 16px;cursor:pointer;position:relative}
+.day-card .day-header{display:flex;justify-content:space-between;align-items:center}
+.day-card .day-label{font-weight:700;font-size:14px}
+.day-card .day-phase{font-size:10px;color:var(--dim)}
+.day-card .blocks{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.block{padding:8px 12px;border-radius:8px;font-size:12px;font-weight:500;
+background:rgba(255,255,255,.04);border-left:3px solid var(--border)}
+.block.rus{border-left-color:var(--rus);background:rgba(155,89,182,.08)}
+.block.math{border-left-color:var(--math);background:rgba(52,152,219,.08)}
+.block.cs{border-left-color:var(--cs);background:rgba(46,204,113,.08)}
+.block.tutor{border-left-color:var(--warn);background:rgba(243,156,18,.08)}
+.block.exam{border-left-color:var(--danger);background:rgba(231,76,60,.12);
+font-weight:700;font-size:14px;text-align:center;padding:14px}
+.block.rest{border-left-color:var(--ok);background:rgba(46,204,113,.08)}
+.block.test{border-left-color:var(--warn);background:rgba(243,156,18,.1)}
+.block .time{font-size:10px;color:var(--dim);font-family:'JetBrains Mono',monospace}
+
+/* Topics */
+.topic-row{display:flex;align-items:center;padding:10px 14px;gap:10px;
+border-bottom:1px solid rgba(255,255,255,.04)}
+.topic-row:last-child{border-bottom:none}
+.topic-num{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--dim);
+min-width:24px;text-align:center}
+.topic-name{flex:1;font-size:13px;font-weight:500}
+.topic-pri{font-size:10px;font-weight:700;padding:3px 8px;border-radius:12px;white-space:nowrap}
+.pri-crit{background:rgba(231,76,60,.2);color:#ff6b6b}
+.pri-learn{background:rgba(243,156,18,.15);color:#f39c12}
+.pri-high{background:rgba(124,92,255,.15);color:#a78bfa}
+.pri-med{background:rgba(255,255,255,.06);color:var(--dim)}
+.pri-skip{background:rgba(255,255,255,.03);color:#555}
+.pri-bonus{background:rgba(46,204,113,.12);color:#6bffaa}
+
+/* Tracker */
+.tracker-entry{background:var(--card);border:1px solid var(--border);border-radius:12px;
+padding:14px;margin-bottom:10px}
+.tracker-entry .row{display:flex;gap:8px;margin-bottom:8px}
+.tracker-entry input,.tracker-entry select{background:var(--surface);border:1px solid var(--border);
+color:var(--text);border-radius:8px;padding:8px 10px;font-size:13px;font-family:'Manrope',sans-serif;
+flex:1;outline:none}
+.tracker-entry input:focus,.tracker-entry select:focus{border-color:var(--accent)}
+.tracker-entry select{-webkit-appearance:none}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px;
+font-size:14px;font-weight:700;font-family:'Manrope',sans-serif;width:100%;cursor:pointer;
+transition:transform .1s}
+.btn:active{transform:scale(.97)}
+.btn-sm{padding:8px 14px;font-size:12px;width:auto;border-radius:8px}
+.btn-ghost{background:none;border:1px solid var(--border);color:var(--dim)}
+
+.score-card{display:flex;align-items:center;justify-content:space-between;padding:12px 14px}
+.score-card .left{display:flex;align-items:center;gap:10px}
+.score-card .subj{font-size:12px;font-weight:600}
+.score-card .pts{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700}
+.score-card .date-s{font-size:11px;color:var(--dim)}
+.score-card .del{background:none;border:none;color:var(--dim);font-size:18px;cursor:pointer;padding:4px}
+
+/* Checklist */
+.check-item{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;
+-webkit-user-select:none;user-select:none}
+.check-item .box{width:22px;height:22px;border:2px solid var(--border);border-radius:6px;
+display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.2s}
+.check-item.done .box{background:var(--accent);border-color:var(--accent)}
+.check-item.done .box::after{content:'✓';color:#fff;font-size:13px;font-weight:700}
+.check-item.done .label{text-decoration:line-through;color:var(--dim)}
+.check-item .label{font-size:13px;font-weight:500}
+.check-section{font-size:11px;font-weight:700;color:var(--warn);padding:14px 14px 4px;
+letter-spacing:1px;text-transform:uppercase}
+
+/* Today highlight */
+.today-banner{background:linear-gradient(135deg,rgba(124,92,255,.15),rgba(46,204,113,.1));
+border:1px solid rgba(124,92,255,.3);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+.today-banner .t-label{font-size:10px;color:var(--accent);font-weight:700;letter-spacing:1px;
+text-transform:uppercase;margin-bottom:6px}
+.today-banner .t-day{font-size:18px;font-weight:800}
+
+/* Tab pills for subjects */
+.pills{display:flex;gap:6px;padding:0 16px 12px;overflow-x:auto}
+.pill{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid var(--border);
+background:none;color:var(--dim);cursor:pointer;white-space:nowrap;font-family:'Manrope',sans-serif}
+.pill.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+.empty{text-align:center;padding:40px 20px;color:var(--dim);font-size:13px}
+
+/* Week nav */
+.week-nav{display:flex;align-items:center;justify-content:space-between;padding:0 16px 12px}
+.week-nav button{background:none;border:1px solid var(--border);color:var(--text);
+border-radius:8px;padding:6px 12px;font-size:18px;cursor:pointer;font-family:'Manrope',sans-serif}
+.week-nav .week-label{font-size:13px;font-weight:600}
+
+@media(min-width:481px){
+.app{border-left:1px solid var(--border);border-right:1px solid var(--border)}
+.nav{left:50%;transform:translateX(-50%)}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<script type="text/babel">
+const {useState, useEffect, useMemo, useCallback} = React;
+
+// ── DATA ──
+const EXAMS = [
+  {id:'rus', name:'Русский язык', short:'РУС', date:new Date(2026,5,4), score:'~15-20', color:'var(--rus)'},
+  {id:'math', name:'Математика проф', short:'МАТ', date:new Date(2026,5,8), score:'48-52', color:'var(--math)'},
+  {id:'cs', name:'Информатика', short:'ИНФ', date:new Date(2026,5,18), score:'~40', color:'var(--cs)'},
+];
+
+const TODAY = new Date(2026,2,17);
+const dayMs = 864e5;
+const daysUntil = d => Math.ceil((d - TODAY) / dayMs);
+
+const DAYS_RU = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+const MONTHS = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+
+function fmtDate(d){return `${d.getDate()} ${MONTHS[d.getMonth()]}`}
+function fmtDateFull(d){return `${DAYS_RU[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]}`}
+function dateKey(d){return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`}
+
+function getPhase(d){
+  if(d<=new Date(2026,3,19)) return {id:'Ф1',name:'Фундамент',bg:'rgba(124,92,255,.12)'};
+  if(d<=new Date(2026,4,17)) return {id:'Ф2',name:'Интенсив',bg:'rgba(92,140,255,.12)'};
+  if(d<=new Date(2026,5,3)) return {id:'Ф3',name:'Финиш рус',bg:'rgba(155,89,182,.12)'};
+  if(d<=new Date(2026,5,7)) return {id:'Ф4',name:'Финиш мат',bg:'rgba(52,152,219,.12)'};
+  return {id:'Ф5',name:'Финиш инф',bg:'rgba(46,204,113,.12)'};
+}
+
+function getBlocks(d){
+  const wd = d.getDay(); // 0=Sun
+  const ph = getPhase(d).id;
+  
+  // Exam days
+  const dk = dateKey(d);
+  if(dk===dateKey(new Date(2026,5,4))) return [{t:'09:00',s:'🔥 ЭКЗАМЕН: РУССКИЙ ЯЗЫК',c:'exam'}];
+  if(dk===dateKey(new Date(2026,5,8))) return [{t:'09:00',s:'🔥 ЭКЗАМЕН: МАТЕМАТИКА',c:'exam'}];
+  if(dk===dateKey(new Date(2026,5,18))) return [{t:'09:00',s:'🔥 ЭКЗАМЕН: ИНФОРМАТИКА',c:'exam'}];
+  
+  // Pre-exam
+  if(dk===dateKey(new Date(2026,5,3))) return [
+    {t:'16:00',s:'🇷🇺 Лёгкий повтор правил',c:'rus'},{t:'18:00',s:'Просмотр тетради ошибок',c:'rus'},
+    {t:'20:00',s:'ОТДЫХ + ранний сон',c:'rest'}];
+  if(dk===dateKey(new Date(2026,5,7))) return [
+    {t:'16:00',s:'📐 Повтор формул',c:'math'},{t:'18:00',s:'Типовые задачи',c:'math'},
+    {t:'20:00',s:'ОТДЫХ + ранний сон',c:'rest'}];
+  if(dk===dateKey(new Date(2026,5,17))) return [
+    {t:'16:00',s:'💻 Повтор алгоритмов',c:'cs'},{t:'18:00',s:'Просмотр ошибок',c:'cs'},
+    {t:'20:00',s:'ОТДЫХ + ранний сон',c:'rest'}];
+
+  // Tutors: Tue(2) & Thu(4) math 15:40-17:10, Sun(0) CS 10-11
+  if(ph==='Ф1'){
+    if(wd===1) return [ // Mon
+      {t:'16:00',s:'🇷🇺 Орфография + пунктуация',c:'rus'},
+      {t:'17:30',s:'💻 Сист.счисления / логика',c:'cs'},
+      {t:'19:30',s:'🇷🇺 Задания 8-14',c:'rus'}];
+    if(wd===2) return [ // Tue
+      {t:'15:40',s:'📐 Репетитор математика',c:'tutor'},
+      {t:'17:30',s:'🇷🇺 Задания 1-8 + ударения',c:'rus'},
+      {t:'19:30',s:'💻 Алгоритмы / Python',c:'cs'}];
+    if(wd===3) return [ // Wed
+      {t:'16:00',s:'🇷🇺 Сочинение (шаблон)',c:'rus'},
+      {t:'17:30',s:'💻 Программирование Python',c:'cs'},
+      {t:'19:30',s:'🇷🇺 Задания 15-21',c:'rus'}];
+    if(wd===4) return [ // Thu
+      {t:'15:40',s:'📐 Репетитор математика',c:'tutor'},
+      {t:'17:30',s:'💻 Рекурсия / графы',c:'cs'},
+      {t:'19:30',s:'🇷🇺 Н/НН, НЕ/НИ',c:'rus'}];
+    if(wd===5) return [ // Fri
+      {t:'16:00',s:'🇷🇺 Сочинение (практика)',c:'rus'},
+      {t:'17:30',s:'💻 Excel + IP-адреса',c:'cs'},
+      {t:'19:30',s:'🇷🇺 Слабые задания',c:'rus'}];
+    if(wd===6) return [ // Sat
+      {t:'10:00',s:'📝 ПРОБНИК (ротация)',c:'test'},
+      {t:'14:00',s:'Разбор ошибок пробника',c:'test'},
+      {t:'16:00',s:'Работа над слабыми местами',c:''}];
+    if(wd===0) return [ // Sun
+      {t:'10:00',s:'💻 Репетитор информатика',c:'tutor'},
+      {t:'11:30',s:'💻 ДЗ от репетитора',c:'cs'},
+      {t:'14:00',s:'📐 Матем: вариант ч.1',c:'math'},
+      {t:'19:00',s:'Вечер — отдых!',c:'rest'}];
+  }
+  if(ph==='Ф2'){
+    if(wd===1) return [
+      {t:'16:00',s:'🇷🇺 Задания 1-14',c:'rus'},
+      {t:'17:30',s:'💻 Теория игр',c:'cs'},
+      {t:'19:30',s:'📐 Задания 1-8',c:'math'}];
+    if(wd===2) return [
+      {t:'15:40',s:'📐 Репетитор математика',c:'tutor'},
+      {t:'17:30',s:'💻 Программирование',c:'cs'},
+      {t:'19:30',s:'🇷🇺 Задания 15-27',c:'rus'}];
+    if(wd===3) return [
+      {t:'16:00',s:'🇷🇺 Сочинение (полное)',c:'rus'},
+      {t:'17:30',s:'💻 Обработка файлов',c:'cs'},
+      {t:'19:30',s:'📐 Вероятности',c:'math'}];
+    if(wd===4) return [
+      {t:'15:40',s:'📐 Репетитор математика',c:'tutor'},
+      {t:'17:30',s:'💻 Строки + делимость',c:'cs'},
+      {t:'19:30',s:'🇷🇺 Слабые задания',c:'rus'}];
+    if(wd===5) return [
+      {t:'16:00',s:'💻 Полный вариант инфа',c:'cs'},
+      {t:'17:30',s:'🇷🇺 Вариант часть 1',c:'rus'},
+      {t:'19:30',s:'📐 Геометрия',c:'math'}];
+    if(wd===6) return [
+      {t:'10:00',s:'📝 ПРОБНИК (ротация)',c:'test'},
+      {t:'14:00',s:'Разбор ошибок',c:'test'},
+      {t:'16:00',s:'Работа над слабыми',c:''}];
+    if(wd===0) return [
+      {t:'10:00',s:'💻 Репетитор информатика',c:'tutor'},
+      {t:'11:30',s:'💻 ДЗ + вариант',c:'cs'},
+      {t:'14:00',s:'🇷🇺 Сочинение',c:'rus'},
+      {t:'19:00',s:'Вечер — отдых!',c:'rest'}];
+  }
+  if(ph==='Ф3'){
+    if(wd===1) return [
+      {t:'16:00',s:'🇷🇺 Полный вариант',c:'rus'},
+      {t:'17:30',s:'🇷🇺 Разбор + ошибки',c:'rus'},
+      {t:'19:30',s:'💻 Повторение',c:'cs'}];
+    if(wd===2) return [
+      {t:'15:40',s:'📐 Репетитор математика',c:'tutor'},
+      {t:'17:30',s:'🇷🇺 Сочинение',c:'rus'},
+      {t:'19:30',s:'💻 Программирование',c:'cs'}];
+    if(wd===3) return [
+      {t:'16:00',s:'🇷🇺 Полный вариант',c:'rus'},
+      {t:'17:30',s:'🇷🇺 Разбор ошибок',c:'rus'},
+      {t:'19:30',s:'📐 Вариант ч.1',c:'math'}];
+    if(wd===4) return [
+      {t:'15:40',s:'📐 Репетитор математика',c:'tutor'},
+      {t:'17:30',s:'🇷🇺 Слабые задания',c:'rus'},
+      {t:'19:30',s:'💻 Слабые задания',c:'cs'}];
+    if(wd===5) return [
+      {t:'16:00',s:'🇷🇺 Полный вариант',c:'rus'},
+      {t:'17:30',s:'🇷🇺 Разбор ошибок',c:'rus'},
+      {t:'19:30',s:'💻 Вариант инфа',c:'cs'}];
+    if(wd===6) return [
+      {t:'10:00',s:'📝 ПРОБНИК: Русский',c:'test'},
+      {t:'14:00',s:'🇷🇺 Детальный разбор',c:'rus'},
+      {t:'16:00',s:'💻 Повторение',c:'cs'}];
+    if(wd===0) return [
+      {t:'10:00',s:'💻 Репетитор информатика',c:'tutor'},
+      {t:'11:30',s:'💻 ДЗ + вариант',c:'cs'},
+      {t:'14:00',s:'🇷🇺 Повтор правил',c:'rus'},
+      {t:'19:00',s:'Лёгкий вечер',c:'rest'}];
+  }
+  if(ph==='Ф4'){
+    if(wd===0) return [
+      {t:'10:00',s:'💻 Репетитор информатика',c:'tutor'},
+      {t:'12:00',s:'📐 Полный вариант',c:'math'},
+      {t:'16:00',s:'📐 Разбор + формулы',c:'math'}];
+    if(wd===2) return [
+      {t:'15:40',s:'📐 Репетитор математика',c:'tutor'},
+      {t:'17:30',s:'📐 Слабые задания',c:'math'},
+      {t:'19:30',s:'📐 Вариант',c:'math'}];
+    if(wd===4) return [
+      {t:'15:40',s:'📐 Репетитор математика',c:'tutor'},
+      {t:'17:30',s:'📐 Геометрия',c:'math'},
+      {t:'19:30',s:'📐 Вариант ч.2',c:'math'}];
+    return [
+      {t:'16:00',s:'📐 Полный вариант',c:'math'},
+      {t:'17:30',s:'📐 Разбор + ошибки',c:'math'},
+      {t:'19:30',s:'📐 Формулы + слабые',c:'math'}];
+  }
+  // Ф5
+  if(wd===0) return [
+    {t:'10:00',s:'💻 Репетитор информатика',c:'tutor'},
+    {t:'11:30',s:'💻 ДЗ от репетитора',c:'cs'},
+    {t:'14:00',s:'💻 Слабые задания',c:'cs'},
+    {t:'19:00',s:'Вечер — отдых',c:'rest'}];
+  if(wd===2||wd===4) return [
+    {t:'15:40',s:'📐 Репетитор математика',c:'tutor'},
+    {t:'17:30',s:'💻 Программирование',c:'cs'},
+    {t:'19:30',s:'💻 Вариант инфа',c:'cs'}];
+  return [
+    {t:'16:00',s:'💻 Полный вариант инфа',c:'cs'},
+    {t:'17:30',s:'💻 Разбор + ошибки',c:'cs'},
+    {t:'19:30',s:'💻 Программирование задачи',c:'cs'}];
+}
+
+// Topics
+const TOPICS = {
+  rus: [
+    {n:1,t:'Средства связи в тексте',p:'high'},{n:2,t:'Значение слова',p:'med'},
+    {n:3,t:'Стилистический анализ',p:'high'},{n:4,t:'Ударения',p:'learn'},
+    {n:5,t:'Паронимы',p:'learn'},{n:6,t:'Лексические нормы',p:'med'},
+    {n:7,t:'Морфологические нормы',p:'med'},{n:8,t:'Грамм. ошибки (5 б!)',p:'crit'},
+    {n:9,t:'Корни',p:'high'},{n:10,t:'Приставки',p:'high'},
+    {n:11,t:'Суффиксы',p:'high'},{n:12,t:'НЕ/НИ',p:'high'},
+    {n:13,t:'Слитно/раздельно',p:'high'},{n:14,t:'Н/НН',p:'crit'},
+    {n:15,t:'Пунктуация ССП',p:'high'},{n:16,t:'Обособления (2 б)',p:'crit'},
+    {n:17,t:'Вводные слова',p:'high'},{n:18,t:'Знаки в СПП',p:'crit'},
+    {n:19,t:'Пунктуация сложных',p:'crit'},{n:20,t:'Смысловая связь',p:'med'},
+    {n:21,t:'Пункт. анализ',p:'high'},{n:22,t:'Содержание текста',p:'med'},
+    {n:23,t:'Типы речи',p:'med'},{n:24,t:'Лексич. значение',p:'med'},
+    {n:25,t:'Средства связи',p:'med'},{n:26,t:'Выразительность (4 б)',p:'high'},
+    {n:27,t:'СОЧИНЕНИЕ (24 б!!!)',p:'crit'},
+  ],
+  math: [
+    {n:1,t:'Планиметрия (прост.)',p:'med'},{n:2,t:'Векторы',p:'med'},
+    {n:3,t:'Стереометрия (прост.)',p:'med'},{n:4,t:'Вероятности',p:'high'},
+    {n:5,t:'Вероятности (сложн.)',p:'high'},{n:6,t:'Уравнения',p:'med'},
+    {n:7,t:'Неравенства',p:'high'},{n:8,t:'Функции/графики',p:'high'},
+    {n:9,t:'Прикладная матем.',p:'med'},{n:10,t:'Текстовые задачи',p:'high'},
+    {n:11,t:'Производные',p:'high'},{n:12,t:'Экстремумы (2 б)',p:'high'},
+    {n:13,t:'Уравнения ч.2 (2 б)',p:'bonus'},{n:14,t:'Стереом. ч.2 (2 б)',p:'bonus'},
+    {n:15,t:'Неравенства ч.2',p:'skip'},{n:16,t:'Финансы (2 б)',p:'bonus'},
+    {n:17,t:'Планим. ч.2 (3 б)',p:'bonus'},{n:18,t:'Параметры (4 б)',p:'skip'},
+    {n:19,t:'Теория чисел (4 б)',p:'skip'},
+  ],
+  cs: [
+    {n:1,t:'Системы счисления',p:'high'},{n:2,t:'Таблицы истинности',p:'high'},
+    {n:3,t:'Маски поиска',p:'med'},{n:4,t:'Кодирование (Фано)',p:'high'},
+    {n:5,t:'Анализ алгоритмов',p:'high'},{n:6,t:'Автомат-исполнитель',p:'high'},
+    {n:7,t:'Кодирование медиа',p:'med'},{n:8,t:'Комбинаторика',p:'high'},
+    {n:9,t:'Excel задачи',p:'crit'},{n:10,t:'Поиск в строке',p:'high'},
+    {n:11,t:'Рекурсия',p:'high'},{n:12,t:'IP-адреса, сети',p:'high'},
+    {n:13,t:'Формула Хартли',p:'med'},{n:14,t:'Исполнитель (сложн.)',p:'high'},
+    {n:15,t:'Графы (пути)',p:'high'},{n:16,t:'Рекурсия (анализ)',p:'high'},
+    {n:17,t:'Запросы в Excel',p:'crit'},{n:18,t:'Робот-исполнитель',p:'high'},
+    {n:19,t:'Теория игр (1 ход)',p:'high'},{n:20,t:'Теория игр (2 хода)',p:'high'},
+    {n:21,t:'Теория игр (сложн.)',p:'bonus'},{n:22,t:'Анализ программ',p:'high'},
+    {n:23,t:'Обработка данных',p:'crit'},{n:24,t:'Символьные строки',p:'high'},
+    {n:25,t:'Делимость/сортировка',p:'high'},{n:26,t:'Обработка файлов (2б)',p:'crit'},
+    {n:27,t:'Программирование (2б)',p:'bonus'},
+  ],
+};
+
+const PRI_LABELS = {
+  crit:'КРИТ', learn:'УЧИТЬ', high:'Высок', med:'Средн', skip:'Пропуск', bonus:'Бонус'
+};
+const PRI_CLASS = {
+  crit:'pri-crit', learn:'pri-learn', high:'pri-high', med:'pri-med', skip:'pri-skip', bonus:'pri-bonus'
+};
+
+const CHECKLIST = [
+  {section:'Утро'},
+  {id:'c1',text:'10 ударений (5 мин)'},
+  {id:'c2',text:'5 паронимов (3 мин)'},
+  {section:'После школы'},
+  {id:'c3',text:'Отдых 30 мин (прогулка!)'},
+  {id:'c4',text:'Блок 1 → см. расписание'},
+  {id:'c5',text:'Перерыв 15 мин'},
+  {id:'c6',text:'Блок 2 → см. расписание'},
+  {section:'Вечер'},
+  {id:'c7',text:'Ужин + перерыв 30 мин'},
+  {id:'c8',text:'Блок 3 → см. расписание'},
+  {section:'Перед сном'},
+  {id:'c9',text:'Записать баллы в трекер'},
+  {id:'c10',text:'Лечь до 23:00!'},
+];
+
+// ── COMPONENTS ──
+
+function DashTab(){
+  const phase = getPhase(TODAY);
+  const todayBlocks = getBlocks(TODAY);
+  return <div className="section">
+    <div className="today-banner">
+      <div className="t-label">Сегодня</div>
+      <div className="t-day">{fmtDateFull(TODAY)}</div>
+      <div style={{marginTop:6}}>
+        <span className="phase-badge" style={{background:phase.bg,color:'var(--accent)'}}>{phase.id} — {phase.name}</span>
+      </div>
+    </div>
+    
+    {EXAMS.map(e=>{
+      const days = daysUntil(e.date);
+      const total = daysUntil(e.date);
+      const pct = Math.max(0, Math.min(100, ((93-days)/93)*100));
+      return <div key={e.id} className={`card exam-card ${e.id}`}>
+        <div className="days">{days}<span>дней</span></div>
+        <div className="info">
+          <div className="name">{e.name}</div>
+          <div className="date">{fmtDate(e.date)}</div>
+          <div className="score">{e.score} → <span style={{color:'var(--ok)'}}>62+</span></div>
+          <div className="pbar"><div className="fill" style={{width:`${pct}%`,background:e.color}}/></div>
+        </div>
+      </div>
+    })}
+
+    <div className="card" style={{padding:'14px 16px'}}>
+      <div style={{fontSize:11,fontWeight:700,color:'var(--warn)',letterSpacing:1,marginBottom:10}}>СЕГОДНЯ</div>
+      <div style={{display:'flex',flexDirection:'column',gap:6}}>
+        {todayBlocks.map((b,i)=>
+          <div key={i} className={`block ${b.c}`}>
+            <span className="time">{b.t}</span> {b.s}
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+}
+
+function ScheduleTab(){
+  const [weekOffset, setWeekOffset] = useState(0);
+  
+  const weekStart = useMemo(()=>{
+    const d = new Date(TODAY);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day===0?-6:1);
+    d.setDate(diff + weekOffset*7);
+    return d;
+  },[weekOffset]);
+  
+  const days = useMemo(()=>{
+    const arr = [];
+    for(let i=0;i<7;i++){
+      const d = new Date(weekStart);
+      d.setDate(d.getDate()+i);
+      if(d >= new Date(2026,2,17) && d <= new Date(2026,5,18)){
+        arr.push({date:d, blocks:getBlocks(d), phase:getPhase(d)});
+      }
+    }
+    return arr;
+  },[weekStart]);
+
+  return <div className="section">
+    <div className="week-nav">
+      <button onClick={()=>setWeekOffset(w=>w-1)}>‹</button>
+      <span className="week-label">{fmtDate(weekStart)} — {fmtDate(new Date(weekStart.getTime()+6*dayMs))}</span>
+      <button onClick={()=>setWeekOffset(w=>w+1)}>›</button>
+    </div>
+    {days.map((day,i)=>
+      <div key={i} className="card day-card" style={{background:day.phase.bg}}>
+        <div className="day-header">
+          <span className="day-label">{fmtDateFull(day.date)}</span>
+          <span className="phase-badge" style={{background:'rgba(255,255,255,.08)',fontSize:9}}>{day.phase.id}</span>
+        </div>
+        <div className="blocks">
+          {day.blocks.map((b,j)=>
+            <div key={j} className={`block ${b.c}`}>
+              <span className="time">{b.t}</span> {b.s}
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+  </div>
+}
+
+function TopicsTab(){
+  const [subj, setSubj] = useState('rus');
+  const topics = TOPICS[subj];
+  const labels = {rus:'Русский',math:'Математика',cs:'Информатика'};
+  const colors = {rus:'var(--rus)',math:'var(--math)',cs:'var(--cs)'};
+  
+  return <div>
+    <div className="pills">
+      {['rus','math','cs'].map(s=>
+        <button key={s} className={`pill ${subj===s?'active':''}`}
+          style={subj===s?{background:colors[s],borderColor:colors[s]}:{}}
+          onClick={()=>setSubj(s)}>{labels[s]}</button>
+      )}
+    </div>
+    <div className="section" style={{paddingTop:0}}>
+      <div className="card" style={{padding:0,overflow:'hidden'}}>
+        {topics.map((t,i)=>
+          <div key={i} className="topic-row">
+            <span className="topic-num">{t.n}</span>
+            <span className="topic-name">{t.t}</span>
+            <span className={`topic-pri ${PRI_CLASS[t.p]}`}>{PRI_LABELS[t.p]}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+}
+
+function TrackerTab(){
+  const [scores, setScores] = useState(()=>{
+    try{ return JSON.parse(localStorage.getItem('ege-scores')||'[]') }catch{return []}
+  });
+  const [adding, setAdding] = useState(false);
+  const [newSubj, setNewSubj] = useState('rus');
+  const [newScore, setNewScore] = useState('');
+  
+  useEffect(()=>{
+    try{localStorage.setItem('ege-scores', JSON.stringify(scores))}catch{}
+  },[scores]);
+  
+  const addScore = ()=>{
+    if(!newScore) return;
+    setScores(prev=>[{id:Date.now(),subj:newSubj,score:+newScore,
+      date:new Date().toLocaleDateString('ru-RU')},...prev]);
+    setNewScore('');setAdding(false);
+  };
+  const del = id => setScores(prev=>prev.filter(s=>s.id!==id));
+  
+  const subjColors = {rus:'var(--rus)',math:'var(--math)',cs:'var(--cs)'};
+  const subjNames = {rus:'Русский',math:'Матем.',cs:'Инфа'};
+  
+  return <div className="section">
+    {!adding ? 
+      <button className="btn" onClick={()=>setAdding(true)}>+ Записать результат</button> :
+      <div className="tracker-entry">
+        <div className="row">
+          <select value={newSubj} onChange={e=>setNewSubj(e.target.value)}>
+            <option value="rus">Русский</option>
+            <option value="math">Математика</option>
+            <option value="cs">Информатика</option>
+          </select>
+          <input type="number" placeholder="Балл" value={newScore} 
+            onChange={e=>setNewScore(e.target.value)} inputMode="numeric"/>
+        </div>
+        <div className="row">
+          <button className="btn btn-sm" onClick={addScore}>Сохранить</button>
+          <button className="btn btn-sm btn-ghost" onClick={()=>setAdding(false)}>Отмена</button>
+        </div>
+      </div>
+    }
+    
+    <div style={{marginTop:16}}>
+      {scores.length===0 && <div className="empty">Пока пусто. Запиши первый пробник!</div>}
+      {scores.map(s=>
+        <div key={s.id} className="card score-card">
+          <div className="left">
+            <div style={{width:4,height:36,borderRadius:2,background:subjColors[s.subj]}}/>
+            <div>
+              <div className="subj">{subjNames[s.subj]}</div>
+              <div className="date-s">{s.date}</div>
+            </div>
+          </div>
+          <div className="pts" style={{color: s.score>=62?'var(--ok)':s.score>=50?'var(--warn)':'var(--danger)'}}>
+            {s.score}
+          </div>
+          <button className="del" onClick={()=>del(s.id)}>×</button>
+        </div>
+      )}
+    </div>
+  </div>
+}
+
+function ChecklistTab(){
+  const [checked, setChecked] = useState(()=>{
+    try{return JSON.parse(localStorage.getItem('ege-checks')||'{}')}catch{return {}}
+  });
+  
+  const toggle = id => {
+    setChecked(prev=>{
+      const next = {...prev, [id]:!prev[id]};
+      try{localStorage.setItem('ege-checks', JSON.stringify(next))}catch{}
+      return next;
+    });
+  };
+  
+  const reset = ()=>{
+    setChecked({});
+    try{localStorage.setItem('ege-checks','{}')}catch{}
+  };
+  
+  return <div className="section">
+    <div className="card" style={{padding:0,overflow:'hidden'}}>
+      {CHECKLIST.map((item,i)=>{
+        if(item.section) return <div key={i} className="check-section">{item.section}</div>;
+        const done = checked[item.id];
+        return <div key={i} className={`check-item ${done?'done':''}`} onClick={()=>toggle(item.id)}>
+          <div className="box"/>
+          <span className="label">{item.text}</span>
+        </div>
+      })}
+    </div>
+    <button className="btn btn-ghost" style={{marginTop:12}} onClick={reset}>Сбросить на завтра</button>
+  </div>
+}
+
+function App(){
+  const [tab, setTab] = useState('dash');
+  
+  const tabs = [
+    {id:'dash', icon:'◉', label:'Обзор'},
+    {id:'schedule', icon:'▤', label:'Расписание'},
+    {id:'topics', icon:'◎', label:'Темы'},
+    {id:'tracker', icon:'▲', label:'Трекер'},
+    {id:'check', icon:'✓', label:'Чеклист'},
+  ];
+  
+  return <div className="app">
+    <div className="topbar">
+      <h1>EGE PLAN</h1>
+      <div className="sub">17 марта — 18 июня 2026</div>
+    </div>
+    
+    {tab==='dash' && <DashTab/>}
+    {tab==='schedule' && <ScheduleTab/>}
+    {tab==='topics' && <TopicsTab/>}
+    {tab==='tracker' && <TrackerTab/>}
+    {tab==='check' && <ChecklistTab/>}
+    
+    <div className="nav">
+      {tabs.map(t=>
+        <button key={t.id} className={tab===t.id?'active':''} onClick={()=>setTab(t.id)}>
+          <span className="ico">{t.icon}</span>{t.label}
+        </button>
+      )}
+    </div>
+  </div>
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
