@@ -191,9 +191,7 @@ struct ChatView: View {
             .disabled(vm.isSending || input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
-        .background(Color(.secondarySystemBackground).opacity(0.3))
         .glassEffect()
-        .clipShape(RoundedRectangle(cornerRadius: 28))
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
     }
@@ -388,17 +386,14 @@ struct BubbleView: View {
                 }
             }
             .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(bubbleBg.clipShape(bubbleShape))
+            .background(bubbleBg, in: bubbleShape)
         }
     }
 
-    @ViewBuilder
-    private var bubbleBg: some View {
-        if msg.isOutgoing {
-            outBubble.opacity(0.3).glassEffect()
-        } else {
-            inBubble.opacity(0.5).glassEffect()
-        }
+    private var bubbleBg: some ShapeStyle {
+        msg.isOutgoing
+            ? AnyShapeStyle(outBubble)
+            : AnyShapeStyle(Color(.secondarySystemBackground))
     }
 
     private var bubbleShape: RoundedRectangle {
