@@ -138,56 +138,63 @@ struct ChatView: View {
     // MARK: - Input Bar
 
     var inputBar: some View {
-        HStack(alignment: .bottom, spacing: 12) {
-            // Attachment / photo picker
+        HStack(alignment: .bottom, spacing: 8) {
+            // Attachment / photo picker (Bubble 1: Paperclip)
             PhotosPicker(selection: $pickerItems,
                          maxSelectionCount: 10,
                          matching: .any(of: [.images, .videos])) {
                 Image(systemName: "paperclip")
                     .font(.system(size: 24))
                     .foregroundStyle(Color(.secondaryLabel))
-                    .frame(width: 30, height: 36)
+                    .frame(width: 44, height: 44)
             }
+            .glassEffect()
 
-            // Text field capsule
+            // Text field capsule (Bubble 2: Message & Smile)
             HStack(alignment: .bottom, spacing: 8) {
                 TextField("Сообщение", text: $input, axis: .vertical)
                     .lineLimit(1...6)
                     .font(.system(size: 17))
                     .foregroundStyle(Color(.label))
                     .submitLabel(.return)
+                    .padding(.vertical, 10)
 
                 Button {
                 } label: {
                     Image(systemName: "face.smiling")
                         .font(.system(size: 24))
                         .foregroundStyle(Color(.secondaryLabel))
+                        .padding(.bottom, 10)
                 }
             }
-            .padding(.horizontal, 16).padding(.vertical, 8)
-            .background(Color(.tertiarySystemFill), in: Capsule())
+            .padding(.horizontal, 16)
+            .glassEffect()
 
-            // Send / mic
+            // Send / mic (Bubble 3: Recording/Send)
             Button(action: {
                 Task { await vm.send(text: input); input = "" }
             }) {
                 Group {
                     if vm.isSending {
-                        ProgressView().tint(tgAccent)
-                            .frame(width: 30, height: 36)
+                        ProgressView().tint(.white)
+                            .frame(width: 44, height: 44)
                     } else {
                         Image(systemName: input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                              ? "mic" : "arrow.up.circle.fill")
+                              ? "mic" : "arrow.up")
                             .font(.system(size: 24))
-                            .foregroundStyle(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color(.secondaryLabel) : tgAccent)
-                            .frame(width: 30, height: 36)
+                            .foregroundStyle(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color(.label) : .white)
+                            .frame(width: 44, height: 44)
                     }
                 }
+                .background(
+                    Circle().fill(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        ? Color.clear : tgAccent)
+                )
             }
             .disabled(vm.isSending || input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .glassEffect()
         }
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(.regularMaterial)
+        .padding(.horizontal, 12).padding(.bottom, 8)
     }
 
     // MARK: - Toolbar
