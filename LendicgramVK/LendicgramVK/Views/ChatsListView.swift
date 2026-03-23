@@ -6,21 +6,23 @@ private let bg     = Color(red: 0.10, green: 0.13, blue: 0.10)
 // MARK: - Chats List
 
 struct ChatsListView: View {
-    @State private var search = ""
-    @State private var filter = "Все"
+    @StateObject private var vm     = ChatsViewModel()
+    @State private var search       = ""
+    @State private var filter       = "Все"
 
-    let filters = ["Все", "Группы", "Каналы", "Боты", "Личные"]
-    let filterCounts: [String: Int] = ["Группы": 1, "Каналы": 10, "Боты": 15]
+    private let filters = ["Все", "Группы", "Каналы", "Личные"]
 
-    var shown: [VKChat] {
-        let base = VKChat.all
+    private var shown: [VKConversationItem] {
+        let base = vm.items
+        let typed: [VKConversationItem]
         switch filter {
-        case "Группы":  return base.filter { $0.chatType == .group }
-        case "Каналы":  return base.filter { $0.chatType == .channel }
-        case "Боты":    return base.filter { $0.chatType == .bot }
-        case "Личные":  return base.filter { $0.chatType == .personal }
-        default:        return base
+        case "Группы":  typed = base.filter { $0.conversation.peer.type == "group" }
+        case "Каналы":  typed = []  // channels not in messages API by default
+        case "Личные":  typed = base.filter { $0.conversation.peer.type == "user" }
+        default:        typed = base
         }
+        guard !search.isEmpty else { return typed }
+        return typed.filter { vm.displayName(for: $0).localizedCaseInsensitiveContains(search) }
     }
 
     var body: some View {
@@ -31,15 +33,25 @@ struct ChatsListView: View {
                     searchBar
                     filterBar
                     Divider().background(Color(white: 0.18))
-                    chatList
+                    if vm.isLoading && vm.items.isEmpty {
+                        Spacer()
+                        ProgressView().tint(accent)
+                        Spacer()
+                    } else {
+                        chatList
+                    }
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbarItems }
+            .alert("Ошибка", isPresented: .constant(vm.error != nil)) {
+                Button("OK") { vm.error = nil }
+            } message: { Text(vm.error ?? "") }
         }
+        .task { await vm.load() }
     }
 
-    // MARK: Search
+    // MARK: Search bar
 
     var searchBar: some View {
         HStack(spacing: 8) {
@@ -65,30 +77,12 @@ struct ChatsListView: View {
             HStack(spacing: 8) {
                 ForEach(filters, id: \.self) { f in
                     Button { withAnimation(.easeInOut(duration: 0.15)) { filter = f } } label: {
-                        HStack(spacing: 5) {
-                            if f == "Все" {
-                                Image(systemName: "square.grid.2x2.fill")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(filter == f ? Color(white:0.1) : Color(white:0.55))
-                            } else {
-                                Text(f).font(.system(size: 14, weight: .medium))
-                            }
-                            if let c = filterCounts[f] {
-                                Text("\(c)")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .padding(.horizontal, 5).padding(.vertical, 1)
-                                    .background(Capsule().fill(
-                                        filter == f
-                                        ? Color(white:0.15).opacity(0.4)
-                                        : accent))
-                                    .foregroundColor(filter == f ? Color(white:0.1) : .white)
-                            }
-                        }
-                        .padding(.horizontal, f == "Все" ? 10 : 13).padding(.vertical, 8)
-                        .background(Capsule().fill(filter == f ? accent : Color(white: 0.15)))
-                        .foregroundColor(filter == f ? Color(white:0.08) : Color(white:0.85))
-                    }
-                    .buttonStyle(.plain)
+                        Text(f == "Все" ? "⊞" : f)
+                            .font(.system(size: f == "Все" ? 16 : 14, weight: .medium))
+                            .padding(.horizontal, 14).padding(.vertical, 8)
+                            .background(Capsule().fill(filter == f ? accent : Color(white: 0.15)))
+                            .foregroundColor(filter == f ? Color(white: 0.06) : Color(white: 0.85))
+                    }.buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 16).padding(.vertical, 6)
@@ -100,15 +94,27 @@ struct ChatsListView: View {
     var chatList: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
-                ForEach(shown) { chat in
-                    NavigationLink(destination: ChatView(chat: chat)) {
-                        ChatRow(chat: chat)
+                ForEach(shown) { item in
+                    NavigationLink(destination: ChatView(
+                        peerId:   item.conversation.peer.id,
+                        peerName: vm.displayName(for: item)
+                    )) {
+                        ChatRow(
+                            item:     item,
+                            name:     vm.displayName(for: item),
+                            avatar:   vm.avatarURL(for: item),
+                            preview:  vm.lastMessagePreview(item.lastMessage),
+                            unread:   item.conversation.unreadCount ?? 0,
+                            isPinned: item.conversation.isPinned ?? false,
+                            time:     item.lastMessage?.date.vkTime ?? ""
+                        )
                     }
                     .buttonStyle(.plain)
                     Divider().background(Color(white: 0.18)).padding(.leading, 82)
                 }
             }
         }
+        .refreshable { await vm.refresh() }
     }
 
     // MARK: Toolbar
@@ -119,13 +125,8 @@ struct ChatsListView: View {
             Button("Изм.") {}.foregroundColor(accent)
         }
         ToolbarItemGroup(placement: .navigationBarTrailing) {
-            Button { } label: { Image(systemName: "power.circle").font(.system(size: 20)).foregroundColor(accent) }
             Button { } label: { Image(systemName: "person.crop.circle.badge.plus").font(.system(size: 20)).foregroundColor(accent) }
             Button { } label: { Image(systemName: "square.and.pencil").font(.system(size: 20)).foregroundColor(accent) }
-            Circle()
-                .fill(Color(red:0.55,green:0.28,blue:0.12))
-                .frame(width: 32, height: 32)
-                .overlay(Text("L").font(.system(size: 14, weight: .bold)).foregroundColor(.white))
         }
     }
 }
@@ -133,55 +134,49 @@ struct ChatsListView: View {
 // MARK: - Chat Row
 
 struct ChatRow: View {
-    let chat: VKChat
-    private let accent = Color(red: 0.35, green: 0.80, blue: 0.52)
+    let item:     VKConversationItem
+    let name:     String
+    let avatar:   URL?
+    let preview:  String
+    let unread:   Int
+    let isPinned: Bool
+    let time:     String
+
+    private let isOut = false  // determined by lastMessage.isOutgoing below
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            // Avatar
-            Circle()
-                .fill(chat.avatarColor)
-                .frame(width: 54, height: 54)
-                .overlay(
-                    Text(initials(chat.name))
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(.white)
-                )
+            VKAvatarView(url: avatar, name: name, size: 54)
 
             VStack(alignment: .leading, spacing: 3) {
-                // Name + time row
                 HStack {
-                    Text(chat.name)
+                    Text(name)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(1)
                     Spacer()
                     HStack(spacing: 3) {
-                        if chat.isSentByMe {
-                            Image(systemName: chat.isDoubleCheck ? "checkmark.circle.fill" : "checkmark")
+                        if item.lastMessage?.isOutgoing == true {
+                            Image(systemName: "checkmark")
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundColor(Color(white: 0.5))
                         }
-                        Text(chat.time)
-                            .font(.system(size: 13))
-                            .foregroundColor(Color(white: 0.5))
+                        Text(time).font(.system(size: 13)).foregroundColor(Color(white: 0.5))
                     }
                 }
-
-                // Last message + badge/pin
                 HStack(alignment: .bottom) {
-                    lastMessageView
+                    Text(preview)
                         .font(.system(size: 14))
                         .foregroundColor(Color(white: 0.5))
                         .lineLimit(2)
                     Spacer()
-                    if chat.unreadCount > 0 {
-                        Text("\(chat.unreadCount)")
+                    if unread > 0 {
+                        Text(unread > 999 ? "999+" : "\(unread)")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 7).padding(.vertical, 3)
-                            .background(Capsule().fill(accent))
-                    } else if chat.isPinned {
+                            .background(Capsule().fill(Color(red:0.35,green:0.80,blue:0.52)))
+                    } else if isPinned {
                         Image(systemName: "pin.fill")
                             .font(.system(size: 11))
                             .foregroundColor(Color(white: 0.4))
@@ -191,36 +186,52 @@ struct ChatRow: View {
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
-        .background(Color(red: 0.10, green: 0.13, blue: 0.10))
+        .background(bg)
     }
+}
 
-    @ViewBuilder var lastMessageView: some View {
-        switch chat.lastMsgType {
-        case .sticker:
-            HStack(spacing: 4) {
-                Text("Стикер")
-                if chat.lastMessage.contains(" ") {
-                    Text(chat.lastMessage.components(separatedBy: " ").last ?? "")
+// MARK: - Reusable Avatar
+
+struct VKAvatarView: View {
+    let url:  URL?
+    let name: String
+    let size: CGFloat
+
+    var body: some View {
+        Group {
+            if let url = url {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let img): img.resizable().scaledToFill()
+                    default: placeholder
+                    }
                 }
-            }
-        case .videoNote:
-            HStack(spacing: 5) {
-                Image(systemName: "play.circle.fill").font(.system(size: 14))
-                Text("Видеосообщение")
-            }
-        case .photo:
-            HStack(spacing: 5) {
-                Image(systemName: "photo").font(.system(size: 14))
-                Text("Фотография")
-            }
-        default:
-            Text(chat.lastMessage)
+            } else { placeholder }
         }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
     }
 
-    func initials(_ name: String) -> String {
+    var placeholder: some View {
+        Circle()
+            .fill(LinearGradient(
+                colors: [Color(hue: nameHue, saturation: 0.55, brightness: 0.55),
+                         Color(hue: nameHue, saturation: 0.70, brightness: 0.35)],
+                startPoint: .topLeading, endPoint: .bottomTrailing))
+            .overlay(
+                Text(initials)
+                    .font(.system(size: size * 0.38, weight: .semibold))
+                    .foregroundColor(.white)
+            )
+    }
+
+    private var initials: String {
         let parts = name.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
         if parts.count >= 2 { return String(parts[0].prefix(1)) + String(parts[1].prefix(1)) }
         return String(name.prefix(2)).uppercased()
+    }
+    private var nameHue: Double {
+        let hash = name.unicodeScalars.reduce(0) { $0 &+ Int($1.value) }
+        return Double(abs(hash) % 360) / 360.0
     }
 }
