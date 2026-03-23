@@ -1,8 +1,8 @@
 import Foundation
 
 enum VKConfig {
-    // VK Android app ID — universal, does not require App Store registration
-    static let appId      = "2274003"
+    // Kate Mobile app ID — supports standard OAuth web flow (implicit grant)
+    static let appId      = "2685278"
     static let apiVersion = "5.199"
     static let baseURL    = "https://api.vk.com/method"
 
