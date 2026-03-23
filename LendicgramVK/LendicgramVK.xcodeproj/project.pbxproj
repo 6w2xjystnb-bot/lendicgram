@@ -1,0 +1,224 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B001 /* LendicgramVKApp.swift in Sources */    = {isa = PBXBuildFile; fileRef = F001; };
+		B002 /* ContentView.swift in Sources */        = {isa = PBXBuildFile; fileRef = F002; };
+		B003 /* VKModels.swift in Sources */           = {isa = PBXBuildFile; fileRef = F003; };
+		B004 /* VKConfig.swift in Sources */           = {isa = PBXBuildFile; fileRef = F004; };
+		B005 /* VKAuthService.swift in Sources */      = {isa = PBXBuildFile; fileRef = F005; };
+		B006 /* VKAPIService.swift in Sources */       = {isa = PBXBuildFile; fileRef = F006; };
+		B007 /* VKLongPollService.swift in Sources */  = {isa = PBXBuildFile; fileRef = F007; };
+		B008 /* ChatsViewModel.swift in Sources */     = {isa = PBXBuildFile; fileRef = F008; };
+		B009 /* ChatViewModel.swift in Sources */      = {isa = PBXBuildFile; fileRef = F009; };
+		B010 /* ProfileViewModel.swift in Sources */   = {isa = PBXBuildFile; fileRef = F010; };
+		B011 /* AuthView.swift in Sources */           = {isa = PBXBuildFile; fileRef = F011; };
+		B012 /* ChatsListView.swift in Sources */      = {isa = PBXBuildFile; fileRef = F012; };
+		B013 /* ChatView.swift in Sources */           = {isa = PBXBuildFile; fileRef = F013; };
+		B014 /* ProfileView.swift in Sources */        = {isa = PBXBuildFile; fileRef = F014; };
+		B015 /* ContactsView.swift in Sources */       = {isa = PBXBuildFile; fileRef = F015; };
+		B016 /* Assets.xcassets in Resources */        = {isa = PBXBuildFile; fileRef = F016; };
+		B017 /* AudioPlayerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F017; };
+		B018 /* ContactsViewModel.swift in Sources */  = {isa = PBXBuildFile; fileRef = F018; };
+		B019 /* ImageCacheService.swift in Sources */  = {isa = PBXBuildFile; fileRef = F019; };
+		B020 /* CachedAsyncImage.swift in Sources */   = {isa = PBXBuildFile; fileRef = F020; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		F001 /* LendicgramVKApp.swift */   = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/LendicgramVKApp.swift";          sourceTree = "<group>"; };
+		F002 /* ContentView.swift */       = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/ContentView.swift";               sourceTree = "<group>"; };
+		F003 /* VKModels.swift */          = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/VKModels.swift";               sourceTree = "<group>"; };
+		F004 /* VKConfig.swift */          = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/VKConfig.swift";             sourceTree = "<group>"; };
+		F005 /* VKAuthService.swift */     = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/VKAuthService.swift";        sourceTree = "<group>"; };
+		F006 /* VKAPIService.swift */      = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/VKAPIService.swift";         sourceTree = "<group>"; };
+		F007 /* VKLongPollService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/VKLongPollService.swift";    sourceTree = "<group>"; };
+		F008 /* ChatsViewModel.swift */    = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ViewModels/ChatsViewModel.swift";     sourceTree = "<group>"; };
+		F009 /* ChatViewModel.swift */     = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ViewModels/ChatViewModel.swift";      sourceTree = "<group>"; };
+		F010 /* ProfileViewModel.swift */  = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ViewModels/ProfileViewModel.swift";   sourceTree = "<group>"; };
+		F011 /* AuthView.swift */          = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/AuthView.swift";                sourceTree = "<group>"; };
+		F012 /* ChatsListView.swift */     = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ChatsListView.swift";           sourceTree = "<group>"; };
+		F013 /* ChatView.swift */          = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ChatView.swift";                sourceTree = "<group>"; };
+		F014 /* ProfileView.swift */       = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ProfileView.swift";             sourceTree = "<group>"; };
+		F015 /* ContactsView.swift */      = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ContactsView.swift";            sourceTree = "<group>"; };
+		F016 /* Assets.xcassets */         = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets;                   sourceTree = "<group>"; };
+		F017 /* AudioPlayerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/AudioPlayerService.swift"; sourceTree = "<group>"; };
+		F018 /* ContactsViewModel.swift */  = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ViewModels/ContactsViewModel.swift";  sourceTree = "<group>"; };
+		F019 /* ImageCacheService.swift */  = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/ImageCacheService.swift";    sourceTree = "<group>"; };
+		F020 /* CachedAsyncImage.swift */   = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/CachedAsyncImage.swift";        sourceTree = "<group>"; };
+		P001 /* LendicgramVK.app */        = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LendicgramVK.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		PH_FW /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		GRP_ROOT = {
+			isa = PBXGroup;
+			children = (GRP_SRC, GRP_PROD);
+			sourceTree = "<group>";
+		};
+		GRP_SRC /* LendicgramVK */ = {
+			isa = PBXGroup;
+			children = (
+				F001, F002,
+				F003,
+				F004, F005, F006, F007, F017, F019,
+				F008, F009, F010, F018,
+				F011, F012, F013, F014, F015, F020,
+				F016,
+			);
+			path = LendicgramVK;
+			sourceTree = "<group>";
+		};
+		GRP_PROD /* Products */ = {
+			isa = PBXGroup;
+			children = (P001);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		TGT001 /* LendicgramVK */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CL_TGT;
+			buildPhases = (PH_SRC, PH_FW, PH_RES);
+			buildRules = ();
+			dependencies = ();
+			name = LendicgramVK;
+			productName = LendicgramVK;
+			productReference = P001;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		PROJ001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1800;
+				LastUpgradeCheck = 1800;
+				TargetAttributes = { TGT001 = { CreatedOnToolsVersion = 18.0; }; };
+			};
+			buildConfigurationList = CL_PROJ;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = ru;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, ru, Base);
+			mainGroup = GRP_ROOT;
+			productRefGroup = GRP_PROD;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (TGT001);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		PH_RES /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (B016);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		PH_SRC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B001, B002,
+				B003,
+				B004, B005, B006, B007, B017, B019,
+				B008, B009, B010, B018,
+				B011, B012, B013, B014, B015, B020,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		CFG_TGT_DBG /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Lendicgram;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Нужна для отправки фото";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Нужен для голосовых сообщений";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lendic.LendicgramVK;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		CFG_TGT_REL /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Lendicgram;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Нужна для отправки фото";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Нужен для голосовых сообщений";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lendic.LendicgramVK;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		CFG_PROJ_DBG /* Debug */   = { isa = XCBuildConfiguration; buildSettings = { SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; }; name = Debug; };
+		CFG_PROJ_REL /* Release */ = { isa = XCBuildConfiguration; buildSettings = {}; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		CL_PROJ = { isa = XCConfigurationList; buildConfigurations = (CFG_PROJ_DBG, CFG_PROJ_REL); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		CL_TGT  = { isa = XCConfigurationList; buildConfigurations = (CFG_TGT_DBG, CFG_TGT_REL); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+
+	};
+	rootObject = PROJ001;
+}

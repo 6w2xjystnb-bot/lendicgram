@@ -1,0 +1,228 @@
+name: Build LendicgramVK IPA (AltStore)
+
+on:
+  push:
+    branches:
+      - claude/ios-vk-client-liquid-glass-4JT1A
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Pick the newest Xcode available ─────────────────────────────────
+      - name: Select latest Xcode
+        run: |
+          echo "=== Available Xcode installs ==="
+          ls /Applications/ | grep -i xcode | sort -V
+
+          XCODE=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          echo "Using: $XCODE"
+          sudo xcode-select -s "$XCODE"
+
+          echo "=== Xcode version ==="
+          xcodebuild -version
+
+          echo "=== Available SDKs ==="
+          xcodebuild -showsdks | grep -E 'iphoneos|iphonesimulator'
+
+      # ── 3. Detect best iOS SDK ──────────────────────────────────────────────
+      - name: Detect iOS SDK
+        id: sdk
+        run: |
+          SDK=$(xcodebuild -showsdks 2>/dev/null \
+            | grep '^.*iphoneos' \
+            | awk '{print $NF}' \
+            | sort -V | tail -1)
+          echo "sdk=$SDK" >> "$GITHUB_OUTPUT"
+          echo "Chosen SDK: [$SDK]"
+
+          if xcodebuild -showsdks 2>/dev/null | grep -q 'iphoneos26'; then
+            DEPLOY="26.0"
+          else
+            DEPLOY="17.0"
+          fi
+          echo "deploy=$DEPLOY" >> "$GITHUB_OUTPUT"
+          echo "Deployment target: $DEPLOY"
+
+      # ── 4. Build (no code-signing, raw xcodebuild output) ──────────────────
+      - name: Build LendicgramVK
+        run: |
+          SDK="${{ steps.sdk.outputs.sdk }}"
+          DEPLOY="${{ steps.sdk.outputs.deploy }}"
+          DERIVED="$GITHUB_WORKSPACE/DerivedData"
+
+          echo "▶ SDK=$SDK  DEPLOY=$DEPLOY  DERIVED=$DERIVED"
+
+          echo "=== Available schemes ==="
+          xcodebuild -project LendicgramVK/LendicgramVK.xcodeproj -list 2>&1 || true
+
+          # Run xcodebuild; tee full log; propagate real exit code
+          set -o pipefail
+          xcodebuild \
+            -project LendicgramVK/LendicgramVK.xcodeproj \
+            -scheme LendicgramVK \
+            -configuration Release \
+            -sdk "$SDK" \
+            -derivedDataPath "$DERIVED" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_ALLOWED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            IPHONEOS_DEPLOYMENT_TARGET="$DEPLOY" \
+            ONLY_ACTIVE_ARCH=NO \
+            ARCHS="arm64" \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=NO \
+            SWIFT_VERSION=5 \
+            build 2>&1 | tee "$GITHUB_WORKSPACE/xcodebuild.log"
+
+      # ── 5. Locate .app ─────────────────────────────────────────────────────
+      - name: Locate .app
+        id: locate
+        run: |
+          DERIVED="$GITHUB_WORKSPACE/DerivedData"
+          echo "=== DerivedData tree (Products only) ==="
+          find "$DERIVED/Build/Products" -maxdepth 3 2>/dev/null | head -40 || true
+
+          APP=$(find "$DERIVED/Build/Products" -name "*.app" -not -name "*.appex" | head -1)
+          if [ -z "$APP" ]; then
+            echo "❌ .app not found in DerivedData. Searching whole workspace..."
+            APP=$(find "$GITHUB_WORKSPACE" -name "*.app" \
+              -not -path "*/.git/*" \
+              -not -name "*.appex" \
+              -not -path "*/Simulator/*" | head -1)
+          fi
+
+          if [ -z "$APP" ]; then
+            echo "❌ Still no .app found. Aborting."
+            exit 1
+          fi
+
+          echo "✅ Found: $APP  ($(du -sh "$APP" | cut -f1))"
+          echo "app=$APP" >> "$GITHUB_OUTPUT"
+
+      # ── 6. Package .app → .ipa ─────────────────────────────────────────────
+      - name: Package IPA
+        run: |
+          APP="${{ steps.locate.outputs.app }}"
+          echo "Packaging: $APP"
+
+          rm -rf /tmp/ipa_stage
+          mkdir -p /tmp/ipa_stage/Payload
+          cp -r "$APP" /tmp/ipa_stage/Payload/
+
+          cd /tmp/ipa_stage
+          zip -qr "$GITHUB_WORKSPACE/LendicgramVK_AltStore.ipa" Payload/
+
+          cd "$GITHUB_WORKSPACE"
+          echo "📦 IPA: $(du -h LendicgramVK_AltStore.ipa | cut -f1)"
+          ls -lh LendicgramVK_AltStore.ipa
+
+      # ── 7. Verify IPA structure ─────────────────────────────────────────────
+      - name: Verify IPA
+        run: |
+          echo "=== IPA contents (first 30 lines) ==="
+          unzip -l LendicgramVK_AltStore.ipa | head -30
+
+          BINARY=$(unzip -l LendicgramVK_AltStore.ipa \
+            | awk '{print $4}' \
+            | grep -E "Payload/[^/]+\.app/[^./]+" | head -1)
+          echo "Main binary: $BINARY"
+
+      # ── 8. Generate AltStore source JSON ───────────────────────────────────
+      - name: Generate AltStore source JSON
+        run: |
+          VERSION="1.0.$(date +%Y%m%d%H%M)"
+          DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          SIZE=$(wc -c < LendicgramVK_AltStore.ipa | tr -d ' ')
+
+          cat > altstore_source.json << ENDJSON
+          {
+            "name": "LendicgramVK Source",
+            "identifier": "com.lendic.LendicgramVK",
+            "sourceURL": "",
+            "apps": [
+              {
+                "name": "LendicgramVK",
+                "bundleIdentifier": "com.lendic.LendicgramVK",
+                "developerName": "lendic42",
+                "version": "${VERSION}",
+                "versionDate": "${DATE}",
+                "versionDescription": "Альтернативный VK клиент.\nLiquid Glass tab bar (iOS 26).",
+                "downloadURL": "",
+                "localizedDescription": "Неофициальный клиент ВКонтакте с тёмной темой и Liquid Glass навигацией.",
+                "iconURL": "",
+                "tintColor": "66E096",
+                "size": ${SIZE},
+                "screenshotURLs": [],
+                "permissions": [
+                  { "type": "camera",     "usageDescription": "Видеосообщения и фото" },
+                  { "type": "microphone", "usageDescription": "Голосовые сообщения" }
+                ],
+                "minOSVersion": "17.0"
+              }
+            ],
+            "news": []
+          }
+          ENDJSON
+
+          echo "=== altstore_source.json ==="
+          cat altstore_source.json
+
+      # ── 9. Upload artifacts ─────────────────────────────────────────────────
+      - name: Upload IPA
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LendicgramVK_AltStore
+          path: LendicgramVK_AltStore.ipa
+          retention-days: 90
+
+      - name: Upload AltStore source JSON
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: altstore_source
+          path: altstore_source.json
+          retention-days: 90
+
+      # Always upload build log for debugging
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild_log
+          path: xcodebuild.log
+          retention-days: 14
+
+      # ── 10. Job summary ─────────────────────────────────────────────────────
+      - name: Build summary
+        if: always()
+        run: |
+          {
+            echo "## LendicgramVK Build"
+            echo ""
+            if [ -f LendicgramVK_AltStore.ipa ]; then
+              SZ=$(du -h LendicgramVK_AltStore.ipa | cut -f1)
+              echo "✅ **IPA:** \`LendicgramVK_AltStore.ipa\` — $SZ"
+              echo ""
+              echo "### Установка через AltStore / SideStore"
+              echo "1. Скачай **LendicgramVK_AltStore** из артефактов этого запуска"
+              echo "2. Перенеси \`.ipa\` на iPhone (AirDrop, Files или \`ideviceinstaller\`)"
+              echo "3. Открой в **AltStore → My Apps → +** → выбери файл"
+              echo "   _или_ нажми «Открыть с помощью AltStore» прямо из Files"
+              echo "4. Готово — AltStore подпишет IPA личным сертификатом Apple ID"
+              echo ""
+              echo "> Также работает через **SideStore**, **Sideloadly** и **AltServer**."
+            else
+              echo "❌ IPA не создан — скачай \`xcodebuild_log\` и проверь ошибки компиляции."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
