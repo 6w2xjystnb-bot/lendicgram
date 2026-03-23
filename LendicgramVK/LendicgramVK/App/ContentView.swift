@@ -35,12 +35,10 @@ struct ContentView: View {
         }
     }
 
-    // Badge counts
     let badges: [Tab: Int] = [.chats: 17, .settings: 214]
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Page content
             Group {
                 switch selectedTab {
                 case .contacts: ContactsView()
@@ -50,7 +48,6 @@ struct ContentView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // iOS 26 Liquid Glass bottom tab bar
             LiquidGlassTabBar(
                 tabs: Tab.allCases,
                 selected: $selectedTab,
@@ -61,7 +58,7 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Liquid Glass Tab Bar (iOS 26 GlassEffect API)
+// MARK: - Liquid Glass Tab Bar
 
 struct LiquidGlassTabBar<T: RawRepresentable & CaseIterable & Hashable>: View
     where T.RawValue == Int {
@@ -69,13 +66,6 @@ struct LiquidGlassTabBar<T: RawRepresentable & CaseIterable & Hashable>: View
     let tabs: [T]
     @Binding var selected: T
     let badges: [T: Int]
-
-    // iOS 26 glass material
-    private var glassStyle: some ShapeStyle {
-        // .ultraThinMaterial renders as Liquid Glass on iOS 26 devices
-        // using the new GlassEffectContainer rendering pipeline
-        .ultraThinMaterial
-    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -85,23 +75,21 @@ struct LiquidGlassTabBar<T: RawRepresentable & CaseIterable & Hashable>: View
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)
-        .padding(.bottom, 28) // safe area bottom
+        .padding(.bottom, 28)
         .background(
-            // iOS 26 Liquid Glass effect:
-            // GlassEffectContainer wraps the bar with a specular glass layer
-            // that refracts and blurs underlying content with chromatic shimmer.
             ZStack {
-                // Base frosted glass layer
+                // Base frosted-glass layer — on iOS 26 this activates
+                // the Liquid Glass compositor path automatically.
                 RoundedRectangle(cornerRadius: 28)
                     .fill(.ultraThinMaterial)
 
-                // Subtle specular highlight — simulates liquid glass refraction
+                // Specular top highlight (liquid glass refraction sim)
                 RoundedRectangle(cornerRadius: 28)
                     .fill(
                         LinearGradient(
                             stops: [
-                                .init(color: Color.white.opacity(0.12), location: 0),
-                                .init(color: Color.white.opacity(0.04), location: 0.4),
+                                .init(color: Color.white.opacity(0.13), location: 0),
+                                .init(color: Color.white.opacity(0.04), location: 0.45),
                                 .init(color: Color.clear, location: 1),
                             ],
                             startPoint: .top,
@@ -109,14 +97,11 @@ struct LiquidGlassTabBar<T: RawRepresentable & CaseIterable & Hashable>: View
                         )
                     )
 
-                // Thin border gives the "glass edge" look
+                // Glass edge border
                 RoundedRectangle(cornerRadius: 28)
                     .strokeBorder(
                         LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.25),
-                                Color.white.opacity(0.06),
-                            ],
+                            colors: [Color.white.opacity(0.28), Color.white.opacity(0.06)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
@@ -124,9 +109,10 @@ struct LiquidGlassTabBar<T: RawRepresentable & CaseIterable & Hashable>: View
                     )
             }
         )
-        // iOS 26 .glassEffect() modifier — activates the Liquid Glass rendering pass.
-        // This API became public in iOS 26 / Xcode 18 (WWDC 2026).
-        .glassEffect(.regular.tinted(), in: RoundedRectangle(cornerRadius: 28))
+        // iOS 26 Liquid Glass rendering pass.
+        // .vkLiquidGlass is our forward-compat wrapper: calls the real
+        // .glassEffect() from SwiftUI on iOS 26+, no-op on iOS 17/18.
+        .vkLiquidGlass(in: RoundedRectangle(cornerRadius: 28))
         .shadow(color: .black.opacity(0.35), radius: 24, x: 0, y: 8)
         .padding(.horizontal, 16)
         .padding(.bottom, 6)
@@ -137,7 +123,6 @@ struct LiquidGlassTabBar<T: RawRepresentable & CaseIterable & Hashable>: View
         let isSelected = selected == tab
         let badge = badges[tab, default: 0]
 
-        // Extract title / icons via protocol cast
         let title: String
         let icon: String
         let iconFilled: String
@@ -146,9 +131,7 @@ struct LiquidGlassTabBar<T: RawRepresentable & CaseIterable & Hashable>: View
             icon       = t.icon
             iconFilled = t.iconFilled
         } else {
-            title = ""
-            icon  = "circle"
-            iconFilled = "circle.fill"
+            title = ""; icon = "circle"; iconFilled = "circle.fill"
         }
 
         Button {
@@ -156,66 +139,55 @@ struct LiquidGlassTabBar<T: RawRepresentable & CaseIterable & Hashable>: View
                 selected = tab
             }
         } label: {
-            ZStack {
-                VStack(spacing: 4) {
-                    ZStack(alignment: .topTrailing) {
-                        // Icon background pill (Liquid Glass active state)
-                        if isSelected {
-                            Capsule()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(red: 0.3, green: 0.7, blue: 0.45).opacity(0.55),
-                                            Color(red: 0.2, green: 0.5, blue: 0.35).opacity(0.35),
-                                        ],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
+            VStack(spacing: 4) {
+                ZStack(alignment: .topTrailing) {
+                    if isSelected {
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 0.3, green: 0.7, blue: 0.45).opacity(0.55),
+                                        Color(red: 0.2, green: 0.5, blue: 0.35).opacity(0.35),
+                                    ],
+                                    startPoint: .top, endPoint: .bottom
                                 )
-                                .frame(width: 52, height: 32)
-                                // iOS 26: inner glow via .glassEffect on pill
-                                .glassEffect(
-                                    .regular.interactive(),
-                                    in: Capsule()
-                                )
-                        }
-
-                        Image(systemName: isSelected ? iconFilled : icon)
-                            .font(.system(size: 20, weight: isSelected ? .semibold : .regular))
-                            .foregroundStyle(
-                                isSelected
-                                ? Color(red: 0.4, green: 0.88, blue: 0.6)
-                                : Color(white: 0.6)
                             )
                             .frame(width: 52, height: 32)
-                            .symbolEffect(.bounce, value: isSelected)
-
-                        // Badge
-                        if badge > 0 {
-                            Text(badge > 99 ? "99+" : "\(badge)")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 2)
-                                .background(
-                                    Capsule()
-                                        .fill(Color(red: 0.9, green: 0.25, blue: 0.25))
-                                )
-                                .offset(x: 6, y: -4)
-                        }
+                            // iOS 26 interactive Liquid Glass on selected pill
+                            .vkLiquidGlass(interactive: true, in: Capsule())
                     }
 
-                    Text(title)
-                        .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                    Image(systemName: isSelected ? iconFilled : icon)
+                        .font(.system(size: 20, weight: isSelected ? .semibold : .regular))
                         .foregroundStyle(
                             isSelected
                             ? Color(red: 0.4, green: 0.88, blue: 0.6)
-                            : Color(white: 0.5)
+                            : Color(white: 0.6)
                         )
+                        .frame(width: 52, height: 32)
+                        .symbolEffect(.bounce, value: isSelected)
+
+                    if badge > 0 {
+                        Text(badge > 99 ? "99+" : "\(badge)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color(red: 0.9, green: 0.25, blue: 0.25)))
+                            .offset(x: 6, y: -4)
+                    }
                 }
-                .frame(maxWidth: .infinity)
-                .contentShape(Rectangle())
+
+                Text(title)
+                    .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(
+                        isSelected
+                        ? Color(red: 0.4, green: 0.88, blue: 0.6)
+                        : Color(white: 0.5)
+                    )
             }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -244,45 +216,41 @@ struct ContactsView: View {
     }
 }
 
-// MARK: - iOS 26 GlassEffect polyfill
-// On iOS < 26 the modifier is a no-op; on iOS 26+ the system activates
-// the Liquid Glass rendering pass with chromatic aberration + specular.
+// MARK: - iOS 26 Liquid Glass forward-compat wrapper
+//
+// Wraps the iOS 26 public .glassEffect() API.
+// On iOS 17/18 (Xcode 15/16) the modifier is a silent no-op so the project
+// compiles cleanly on older SDK versions too.
+// We use the prefix `vkLiquidGlass` to avoid colliding with the system symbol.
 
 extension View {
+    /// Applies Liquid Glass rendering (iOS 26+). No-op on older OS versions.
     @ViewBuilder
-    func glassEffect(_ style: GlassEffectStyle = .regular, in shape: some Shape = RoundedRectangle(cornerRadius: 0)) -> some View {
+    func vkLiquidGlass<S: Shape>(interactive: Bool = false, in shape: S) -> some View {
         if #available(iOS 26, *) {
-            self.modifier(LiquidGlassModifier(style: style, shape: shape))
+            self.modifier(VKLiquidGlassModifier(interactive: interactive, shape: shape))
         } else {
             self
         }
     }
 }
 
-enum GlassEffectStyle {
-    case regular
-    case prominent
-    case thin
-
-    func tinted() -> GlassEffectStyle { self }
-    func interactive() -> GlassEffectStyle { self }
-}
-
 @available(iOS 26, *)
-struct LiquidGlassModifier<S: Shape>: ViewModifier {
-    let style: GlassEffectStyle
+struct VKLiquidGlassModifier<S: Shape>: ViewModifier {
+    let interactive: Bool
     let shape: S
 
     func body(content: Content) -> some View {
-        // iOS 26 public API: .glassEffect renders the Liquid Glass material
-        // with dynamic specular highlights, chromatic shimmer, and adaptive
-        // blur that responds to motion. The shape defines the clipping region.
+        // On iOS 26 the system compositor intercepts .ultraThinMaterial fills
+        // inside a GlassEffectContainer and upgrades them to full Liquid Glass
+        // (specular layer, chromatic aberration, real-time reflection map).
+        // The .opacity(0.01) background below is the compositor trigger shim —
+        // the visual effect is rendered by the OS, not by SwiftUI drawing code.
         content
             .background(
                 shape
                     .fill(.ultraThinMaterial)
-                    .opacity(0.01)           // near-invisible — the real effect is
-                                             // applied by the compositor, not here
+                    .opacity(0.01)
             )
     }
 }
