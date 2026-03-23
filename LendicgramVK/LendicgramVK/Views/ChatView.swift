@@ -138,7 +138,8 @@ struct ChatView: View {
     // MARK: - Input Bar
 
     var inputBar: some View {
-        HStack(alignment: .bottom, spacing: 8) {
+    var inputBar: some View {
+        HStack(alignment: .bottom, spacing: 12) {
             // Attachment / photo picker
             PhotosPicker(selection: $pickerItems,
                          maxSelectionCount: 10,
@@ -146,11 +147,11 @@ struct ChatView: View {
                 Image(systemName: "paperclip")
                     .font(.system(size: 24))
                     .foregroundStyle(Color(.secondaryLabel))
-                    .frame(width: 36, height: 36)
+                    .frame(width: 30, height: 36)
             }
 
-            // Text field with emoji
-            HStack(alignment: .bottom) {
+            // Text field capsule
+            HStack(alignment: .bottom, spacing: 8) {
                 TextField("Сообщение", text: $input, axis: .vertical)
                     .lineLimit(1...6)
                     .font(.system(size: 17))
@@ -164,7 +165,8 @@ struct ChatView: View {
                         .foregroundStyle(Color(.secondaryLabel))
                 }
             }
-            .padding(.horizontal, 4).padding(.vertical, 8)
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .background(Color(.tertiarySystemFill), in: Capsule())
 
             // Send / mic
             Button(action: {
@@ -172,28 +174,21 @@ struct ChatView: View {
             }) {
                 Group {
                     if vm.isSending {
-                        ProgressView()
-                            .tint(.white)
-                            .frame(width: 36, height: 36)
+                        ProgressView().tint(tgAccent)
+                            .frame(width: 30, height: 36)
                     } else {
                         Image(systemName: input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                              ? "mic" : "arrow.up")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color(.secondaryLabel) : .white)
-                            .frame(width: 36, height: 36)
+                              ? "mic" : "arrow.up.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color(.secondaryLabel) : tgAccent)
+                            .frame(width: 30, height: 36)
                     }
                 }
-                .background(
-                    Circle().fill(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        ? Color.clear : tgAccent)
-                )
             }
             .disabled(vm.isSending || input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
-        .padding(.horizontal, 14).padding(.vertical, 10)
-        .glassEffect()
-        .padding(.horizontal, 12)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(.regularMaterial)
     }
 
     // MARK: - Toolbar
