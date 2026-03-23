@@ -2,20 +2,6 @@ import SwiftUI
 import AVFoundation
 import PhotosUI
 
-// MARK: - Custom Views
-
-struct LiquidGlass: UIViewRepresentable {
-    var style: UIBlurEffect.Style
-    
-    func makeUIView(context: Context) -> UIVisualEffectView {
-        return UIVisualEffectView(effect: UIBlurEffect(style: style))
-    }
-    
-    func updateUIView(_ uiView: UIVisualEffectView, context: Context) {
-        uiView.effect = UIBlurEffect(style: style)
-    }
-}
-
 // MARK: - Colors (shared)
 
 private let outBubble = Color(red: 0.24, green: 0.52, blue: 0.88)
@@ -205,12 +191,8 @@ struct ChatView: View {
             .disabled(vm.isSending || input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .padding(.horizontal, 14).padding(.vertical, 10)
-        .background(
-            ZStack {
-                LiquidGlass(style: .systemUltraThinMaterial)
-                Color(.secondarySystemBackground).opacity(0.3)
-            }
-        )
+        .background(Color(.secondarySystemBackground).opacity(0.3))
+        .glassEffect()
         .clipShape(RoundedRectangle(cornerRadius: 28))
         .padding(.horizontal, 12)
         .padding(.bottom, 8)
@@ -413,15 +395,9 @@ struct BubbleView: View {
     @ViewBuilder
     private var bubbleBg: some View {
         if msg.isOutgoing {
-            ZStack {
-                LiquidGlass(style: .systemUltraThinMaterial)
-                outBubble.opacity(0.3)
-            }
+            outBubble.opacity(0.3).glassEffect()
         } else {
-            ZStack {
-                LiquidGlass(style: .systemUltraThinMaterial)
-                inBubble.opacity(0.5)
-            }
+            inBubble.opacity(0.5).glassEffect()
         }
     }
 
