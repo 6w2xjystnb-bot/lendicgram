@@ -190,6 +190,34 @@ struct VKAPIMessage: Decodable, Identifiable {
         case fwdMessages = "fwd_messages"; case action
         case updateTime = "update_time"; case important
     }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id           = try c.decode(Int.self, forKey: .id)
+        fromId       = try c.decode(Int.self, forKey: .fromId)
+        peerId       = try c.decode(Int.self, forKey: .peerId)
+        text         = (try? c.decode(String.self, forKey: .text)) ?? ""
+        date         = try c.decode(Int.self, forKey: .date)
+        out          = (try? c.decode(Int.self, forKey: .out)) ?? 0
+        attachments  = try? c.decodeIfPresent([VKAttachment].self, forKey: .attachments)
+        replyMessage = try? c.decodeIfPresent(VKReplyMessage.self, forKey: .replyMessage)
+        fwdMessages  = try? c.decodeIfPresent([VKReplyMessage].self, forKey: .fwdMessages)
+        action       = try? c.decodeIfPresent(VKMessageAction.self, forKey: .action)
+        updateTime   = try? c.decodeIfPresent(Int.self, forKey: .updateTime)
+        important    = try? c.decodeIfPresent(Bool.self, forKey: .important)
+    }
+
+    // Manual init for creating messages in code (send, LongPoll)
+    init(id: Int, fromId: Int, peerId: Int, text: String, date: Int, out: Int,
+         attachments: [VKAttachment]?, replyMessage: VKReplyMessage?,
+         fwdMessages: [VKReplyMessage]?, action: VKMessageAction?,
+         updateTime: Int?, important: Bool?) {
+        self.id = id; self.fromId = fromId; self.peerId = peerId
+        self.text = text; self.date = date; self.out = out
+        self.attachments = attachments; self.replyMessage = replyMessage
+        self.fwdMessages = fwdMessages; self.action = action
+        self.updateTime = updateTime; self.important = important
+    }
 }
 
 struct VKReplyMessage: Decodable, Identifiable {
@@ -202,6 +230,15 @@ struct VKReplyMessage: Decodable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id; case fromId = "from_id"; case peerId = "peer_id"
         case text; case date; case attachments
+    }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id          = try c.decode(Int.self, forKey: .id)
+        fromId      = (try? c.decode(Int.self, forKey: .fromId)) ?? 0
+        peerId      = try? c.decodeIfPresent(Int.self, forKey: .peerId)
+        text        = (try? c.decode(String.self, forKey: .text)) ?? ""
+        date        = (try? c.decode(Int.self, forKey: .date)) ?? 0
+        attachments = try? c.decodeIfPresent([VKAttachment].self, forKey: .attachments)
     }
 }
 
@@ -231,11 +268,30 @@ struct VKAttachment: Decodable {
     let poll: VKPoll?
     let audioMessage: VKAudioMessage?
     let videoMessage: VKVideoMessage?
+
     enum CodingKeys: String, CodingKey {
         case type; case photo; case video; case audio; case doc; case link
         case sticker; case gift; case wall; case graffiti; case poll
         case audioMessage = "audio_message"
         case videoMessage = "video_message"
+    }
+
+    // Defensive decoder: if any attachment sub-type fails, it becomes nil
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        type         = try c.decode(String.self, forKey: .type)
+        photo        = try? c.decodeIfPresent(VKPhoto.self, forKey: .photo)
+        video        = try? c.decodeIfPresent(VKVideo.self, forKey: .video)
+        audio        = try? c.decodeIfPresent(VKAudio.self, forKey: .audio)
+        doc          = try? c.decodeIfPresent(VKDoc.self, forKey: .doc)
+        link         = try? c.decodeIfPresent(VKLink.self, forKey: .link)
+        sticker      = try? c.decodeIfPresent(VKSticker.self, forKey: .sticker)
+        gift         = try? c.decodeIfPresent(VKGift.self, forKey: .gift)
+        wall         = try? c.decodeIfPresent(VKWall.self, forKey: .wall)
+        graffiti     = try? c.decodeIfPresent(VKGraffiti.self, forKey: .graffiti)
+        poll         = try? c.decodeIfPresent(VKPoll.self, forKey: .poll)
+        audioMessage = try? c.decodeIfPresent(VKAudioMessage.self, forKey: .audioMessage)
+        videoMessage = try? c.decodeIfPresent(VKVideoMessage.self, forKey: .videoMessage)
     }
 }
 
@@ -274,7 +330,7 @@ struct VKPhotoSize: Decodable {
 }
 
 struct VKVideo: Decodable {
-    let id: Int
+    let id: Int?
     let ownerId: Int?
     let title: String?
     let duration: Int?
@@ -301,7 +357,7 @@ struct VKVideoImage: Decodable {
 }
 
 struct VKAudio: Decodable {
-    let id: Int
+    let id: Int?
     let ownerId: Int?
     let artist: String?
     let title: String?
@@ -316,9 +372,9 @@ struct VKAudio: Decodable {
 }
 
 struct VKDoc: Decodable {
-    let id: Int
+    let id: Int?
     let ownerId: Int?
-    let title: String
+    let title: String?
     let size: Int?
     let ext: String?
     let url: String?
@@ -329,6 +385,7 @@ struct VKDoc: Decodable {
         if s < 1024 * 1024     { return "\(s / 1024) КБ" }
         return String(format: "%.1f МБ", Double(s) / 1_048_576.0)
     }
+    var displayTitle: String { title ?? "Документ" }
     enum CodingKeys: String, CodingKey {
         case id; case ownerId = "owner_id"; case title; case size
         case ext; case url; case preview
@@ -346,7 +403,7 @@ struct VKDocPreviewGraffiti: Decodable {
 }
 
 struct VKLink: Decodable {
-    let url: String
+    let url: String?
     let title: String?
     let caption: String?
     let description: String?
@@ -370,7 +427,18 @@ struct VKSticker: Decodable {
         case animationUrl = "animation_url"
     }
 }
-struct VKStickerImage: Decodable { let url: String; let width: Int; let height: Int }
+struct VKStickerImage: Decodable {
+    let url: String
+    let width: Int
+    let height: Int
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        url    = (try? c.decode(String.self, forKey: .url)) ?? ""
+        width  = (try? c.decode(Int.self, forKey: .width)) ?? 0
+        height = (try? c.decode(Int.self, forKey: .height)) ?? 0
+    }
+    enum CodingKeys: String, CodingKey { case url; case width; case height }
+}
 
 struct VKGift: Decodable {
     let id: Int
@@ -401,7 +469,7 @@ struct VKGraffiti: Decodable {
 }
 
 struct VKPoll: Decodable {
-    let id: Int
+    let id: Int?
     let ownerId: Int?
     let question: String?
     let votes: Int?
@@ -414,7 +482,14 @@ struct VKPoll: Decodable {
     }
 }
 struct VKPollAnswer: Decodable, Identifiable {
-    let id: Int; let text: String; let votes: Int?; let rate: Double?
+    var id: Int { hashValue }
+    let answerId: Int?
+    let text: String?
+    let votes: Int?
+    let rate: Double?
+    enum CodingKeys: String, CodingKey {
+        case answerId = "id"; case text; case votes; case rate
+    }
 }
 
 struct VKAudioMessage: Decodable {

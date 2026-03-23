@@ -150,7 +150,7 @@ final class ChatsViewModel: ObservableObject {
         case "video":         return "🎬 Видео"
         case "audio_message": return "🎤 Голосовое"
         case "video_message": return "📹 Кружок"
-        case "doc":           return "📎 \(att.doc?.title ?? "Документ")"
+        case "doc":           return "📎 \(att.doc?.displayTitle ?? "Документ")"
         case "audio":         return "🎵 \(att.audio?.artist ?? "") — \(att.audio?.title ?? "")"
         case "link":          return "🔗 \(att.link?.title ?? "Ссылка")"
         case "wall":          return "📝 Запись на стене"

@@ -557,7 +557,7 @@ struct BubbleView: View {
                     .foregroundColor(accent)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(doc?.title ?? "Документ")
+                Text(doc?.displayTitle ?? "Документ")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white)
                     .lineLimit(1)
@@ -684,7 +684,7 @@ struct BubbleView: View {
             ForEach(poll?.answers ?? []) { answer in
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
-                        Text(answer.text)
+                        Text(answer.text ?? "")
                             .font(.system(size: 13))
                             .foregroundColor(.white)
                         Spacer()
