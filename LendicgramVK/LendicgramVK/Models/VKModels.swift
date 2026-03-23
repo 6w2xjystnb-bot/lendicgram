@@ -176,8 +176,11 @@ struct VKLongPollResponse: Decodable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        ts = (try? c.decode(String.self, forKey: .ts))
-            ?? String(try c.decode(Int.self, forKey: .ts))
+        if let s = try? c.decode(String.self, forKey: .ts) {
+            ts = s
+        } else {
+            ts = String(try c.decode(Int.self, forKey: .ts))
+        }
         updates = try? c.decodeIfPresent([[LPValue]].self, forKey: .updates) ?? nil
         failed  = try? c.decodeIfPresent(Int.self, forKey: .failed) ?? nil
     }
