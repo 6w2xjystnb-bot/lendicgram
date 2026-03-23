@@ -70,7 +70,7 @@ final class ChatViewModel: ObservableObject {
             let optMsg = VKAPIMessage(
                 id: msgId, fromId: uid, peerId: peerId,
                 text: text, date: Int(Date().timeIntervalSince1970),
-                out: 1, attachments: nil
+                out: 1, readState: 0, attachments: nil
             )
             messages.append(optMsg)
         } catch { self.error = error.localizedDescription }

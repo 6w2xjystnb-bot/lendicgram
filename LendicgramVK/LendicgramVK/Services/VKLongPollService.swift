@@ -75,6 +75,7 @@ final class VKLongPollService: ObservableObject {
             text: text,
             date: ts,
             out: isOut ? 1 : 0,
+            readState: nil,
             attachments: nil
         )
         newMessage = msg
