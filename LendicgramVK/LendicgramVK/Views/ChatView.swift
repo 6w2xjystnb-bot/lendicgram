@@ -39,8 +39,6 @@ struct ChatView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar { chatToolbar }
-        .toolbarBackground(.regularMaterial, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .tint(tgAccent)
         .alert("Ошибка", isPresented: .constant(vm.error != nil)) {
@@ -325,12 +323,43 @@ struct BubbleView: View {
 
     // MARK: - Bubble content
 
+    var isPureMedia: Bool {
+        guard msg.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              msg.replyMessage == nil,
+              (msg.fwdMessages ?? []).isEmpty,
+              let atts = msg.attachments, atts.count == 1
+        else { return false }
+        
+        let type = atts[0].type
+        return type == "photo" || type == "video" || type == "sticker" || type == "video_message"
+    }
+
     @ViewBuilder
     var bubble: some View {
-        if let sticker = msg.attachments?.first(where: { $0.type == "sticker" })?.sticker {
-            VStack(alignment: msg.isOutgoing ? .trailing : .leading, spacing: 2) {
-                stickerView(sticker)
-                timeAndCheck.padding(.horizontal, 4)
+        if isPureMedia, let att = msg.attachments?.first {
+            if att.type == "sticker" {
+                VStack(alignment: msg.isOutgoing ? .trailing : .leading, spacing: 2) {
+                    stickerView(att.sticker!)
+                    timeAndCheck.padding(.horizontal, 4)
+                }
+            } else if att.type == "video_message" {
+                videoMessageView(att.videoMessage)
+            } else if att.type == "photo" {
+                ZStack(alignment: .bottomTrailing) {
+                    photoView(att.photo)
+                    timeAndCheck
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(Capsule().fill(Color.black.opacity(0.4)))
+                        .padding(6)
+                }
+            } else if att.type == "video" {
+                ZStack(alignment: .bottomTrailing) {
+                    videoView(att.video)
+                    timeAndCheck
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(Capsule().fill(Color.black.opacity(0.4)))
+                        .padding(6)
+                }
             }
         } else {
             VStack(alignment: .leading, spacing: 6) {
@@ -350,22 +379,28 @@ struct BubbleView: View {
                         Text(msg.text.isEmpty ? " " : msg.text)
                             .font(.system(size: 16))
                             .foregroundStyle(msg.isOutgoing ? Color.white : Color(.label))
-                        Spacer(minLength: 0)
                         metaInfo
                     }
                 } else {
-                    HStack { Spacer(); metaInfo }
+                    HStack(spacing: 0) { Spacer(minLength: 0); metaInfo }
                 }
             }
             .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(bubbleBg, in: bubbleShape)
+            .background(bubbleBg.clipShape(bubbleShape))
         }
     }
 
-    private var bubbleBg: some ShapeStyle {
-        msg.isOutgoing
-            ? AnyShapeStyle(outBubble)
-            : AnyShapeStyle(Color(.secondarySystemBackground))
+    @ViewBuilder
+    private var bubbleBg: some View {
+        if msg.isOutgoing {
+            Color.clear
+                .background(.ultraThinMaterial)
+                .background(outBubble.opacity(0.4))
+        } else {
+            Color.clear
+                .background(.ultraThinMaterial)
+                .background(inBubble.opacity(0.65))
+        }
     }
 
     private var bubbleShape: RoundedRectangle {
