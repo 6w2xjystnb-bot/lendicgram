@@ -482,14 +482,18 @@ struct VKPoll: Decodable {
     }
 }
 struct VKPollAnswer: Decodable, Identifiable {
-    var id: Int { hashValue }
-    let answerId: Int?
+    let id: Int
     let text: String?
     let votes: Int?
     let rate: Double?
-    enum CodingKeys: String, CodingKey {
-        case answerId = "id"; case text; case votes; case rate
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id    = (try? c.decode(Int.self, forKey: .id)) ?? Int.random(in: 1...999_999)
+        text  = try? c.decodeIfPresent(String.self, forKey: .text)
+        votes = try? c.decodeIfPresent(Int.self, forKey: .votes)
+        rate  = try? c.decodeIfPresent(Double.self, forKey: .rate)
     }
+    enum CodingKeys: String, CodingKey { case id; case text; case votes; case rate }
 }
 
 struct VKAudioMessage: Decodable {
