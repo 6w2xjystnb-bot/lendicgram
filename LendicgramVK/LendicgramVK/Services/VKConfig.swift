@@ -1,8 +1,7 @@
 import Foundation
 
 enum VKConfig {
-    // Kate Mobile app ID — supports standard OAuth web flow (implicit grant)
-    static let appId      = "2685278"
+    static let appId      = "54500817"
     static let apiVersion = "5.199"
     static let baseURL    = "https://api.vk.com/method"
 
