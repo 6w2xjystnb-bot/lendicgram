@@ -79,6 +79,7 @@ final class ChatsViewModel: ObservableObject {
         case "sticker":       return "🎭 Стикер"
         case "video":         return "🎬 Видео"
         case "audio_message": return "🎤 Голосовое"
+        case "video_message": return "📹 Кружок"
         case "doc":           return "📎 \(att.doc?.title ?? "Документ")"
         default:              return att.type.capitalized
         }

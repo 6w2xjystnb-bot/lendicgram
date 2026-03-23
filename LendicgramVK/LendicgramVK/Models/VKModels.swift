@@ -109,12 +109,14 @@ struct VKAPIMessage: Decodable, Identifiable {
     let text: String
     let date: Int
     let out: Int
+    let readState: Int?
     let attachments: [VKAttachment]?
     var isOutgoing: Bool { out == 1 }
+    var isRead: Bool     { readState == 1 }
     var dateValue: Date  { Date(timeIntervalSince1970: TimeInterval(date)) }
     enum CodingKeys: String, CodingKey {
         case id; case fromId = "from_id"; case peerId = "peer_id"
-        case text; case date; case out; case attachments
+        case text; case date; case out; case readState = "read_state"; case attachments
     }
 }
 
@@ -127,9 +129,11 @@ struct VKAttachment: Decodable {
     let doc: VKDoc?
     let video: VKVideo?
     let audioMessage: VKAudioMessage?
+    let videoMessage: VKVideoMessage?
     enum CodingKeys: String, CodingKey {
         case type; case photo; case sticker; case doc; case video
         case audioMessage = "audio_message"
+        case videoMessage = "video_message"
     }
 }
 
@@ -163,6 +167,16 @@ struct VKAudioMessage: Decodable {
     let duration: Int?
     let linkMp3: String?
     enum CodingKeys: String, CodingKey { case duration; case linkMp3 = "link_mp3" }
+}
+
+struct VKVideoMessage: Decodable {
+    let duration: Int?
+    let previewUrl: String?
+    let linkMp4: String?
+    var previewURL: URL? { URL(string: previewUrl ?? "") }
+    enum CodingKeys: String, CodingKey {
+        case duration; case previewUrl = "preview_url"; case linkMp4 = "link_mp4"
+    }
 }
 
 // MARK: - Long Poll

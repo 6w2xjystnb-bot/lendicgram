@@ -24,8 +24,8 @@ final class ChatViewModel: ObservableObject {
             .compactMap { $0 }
             .filter { $0.peerId == peerId }
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] msg in
-                self?.messages.append(msg)
+            .sink { [weak self] _ in
+                Task { await self?.fetchLatest() }
             }
             .store(in: &bag)
     }
@@ -38,6 +38,18 @@ final class ChatViewModel: ObservableObject {
             r.profiles?.forEach { profiles[$0.id] = $0 }
         } catch { self.error = error.localizedDescription }
         isLoading = false
+    }
+
+    func fetchLatest() async {
+        do {
+            let r = try await api.getHistory(peerId: peerId, count: 10)
+            let existingIds = Set(messages.map { $0.id })
+            let newMsgs = r.items.reversed().filter { !existingIds.contains($0.id) }
+            if !newMsgs.isEmpty {
+                messages.append(contentsOf: newMsgs)
+                r.profiles?.forEach { profiles[$0.id] = $0 }
+            }
+        } catch {}
     }
 
     func loadMore() async {

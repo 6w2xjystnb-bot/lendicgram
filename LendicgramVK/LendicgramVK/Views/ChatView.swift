@@ -38,6 +38,7 @@ struct ChatView: View {
             Button("OK") { vm.error = nil }
         } message: { Text(vm.error ?? "") }
         .task { await vm.load() }
+        .toolbar(.hidden, for: .tabBar)
     }
 
     // MARK: Message List
@@ -156,6 +157,8 @@ struct BubbleView: View {
             stickerView(att.sticker)
         case "audio_message":
             voiceView(att.audioMessage)
+        case "video_message":
+            videoMessageView(att.videoMessage)
         default:
             textBubble("📎 \(att.type)")
         }
@@ -225,15 +228,56 @@ struct BubbleView: View {
                   : Color(red:0.17,green:0.20,blue:0.17)))
     }
 
+    @ViewBuilder
+    func videoMessageView(_ vm: VKVideoMessage?) -> some View {
+        ZStack(alignment: .bottomTrailing) {
+            if let url = vm?.previewURL {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let img):
+                        img.resizable().scaledToFill()
+                            .frame(width: 200, height: 200)
+                            .clipShape(Circle())
+                    default:
+                        Circle()
+                            .fill(Color(white: 0.18))
+                            .frame(width: 200, height: 200)
+                            .overlay(ProgressView().tint(accent))
+                    }
+                }
+            } else {
+                Circle()
+                    .fill(Color(white: 0.18))
+                    .frame(width: 200, height: 200)
+                    .overlay(
+                        Image(systemName: "video.circle")
+                            .font(.system(size: 40))
+                            .foregroundColor(Color(white: 0.4))
+                    )
+            }
+            HStack(spacing: 3) {
+                if let d = vm?.duration {
+                    Text("\(d)с")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white)
+                }
+                timeAndCheck
+            }
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(Capsule().fill(Color.black.opacity(0.5)))
+            .padding(8)
+        }
+    }
+
     var timeAndCheck: some View {
         HStack(spacing: 3) {
             Text(msg.date.vkTime)
                 .font(.system(size: 11))
                 .foregroundColor(Color(white: 0.55))
             if msg.isOutgoing {
-                Image(systemName: "checkmark")
+                Image(systemName: msg.isRead ? "checkmark.circle" : "checkmark")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(Color(white: 0.55))
+                    .foregroundColor(msg.isRead ? accent : Color(white: 0.55))
             }
         }
     }
