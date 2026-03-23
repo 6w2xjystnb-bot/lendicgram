@@ -148,7 +148,7 @@ struct ChatView: View {
                     .foregroundStyle(Color(.secondaryLabel))
                     .frame(width: 44, height: 44)
             }
-            .glassEffect()
+            .background(.thinMaterial, in: Capsule())
 
             // Text field capsule (Bubble 2: Message & Smile)
             HStack(alignment: .bottom, spacing: 8) {
@@ -168,7 +168,7 @@ struct ChatView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .glassEffect()
+            .background(.thinMaterial, in: Capsule())
 
             // Send / mic (Bubble 3: Recording/Send)
             Button(action: {
@@ -192,7 +192,7 @@ struct ChatView: View {
                 )
             }
             .disabled(vm.isSending || input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .glassEffect()
+            .background(.thinMaterial, in: Capsule())
         }
         .padding(.horizontal, 12).padding(.bottom, 8)
     }
