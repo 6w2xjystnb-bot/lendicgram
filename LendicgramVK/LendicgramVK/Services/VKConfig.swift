@@ -1,7 +1,7 @@
 import Foundation
 
 enum VKConfig {
-    static let appId      = "54500817"
+    static let appId      = "2685278" // Kate Mobile — для разработки
     static let apiVersion = "5.199"
     static let baseURL    = "https://api.vk.com/method"
 
