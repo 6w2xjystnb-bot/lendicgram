@@ -60,6 +60,9 @@ jobs:
 
           echo "▶ SDK=$SDK  DEPLOY=$DEPLOY  DERIVED=$DERIVED"
 
+          echo "=== Available schemes ==="
+          xcodebuild -project LendicgramVK/LendicgramVK.xcodeproj -list 2>&1 || true
+
           # Run xcodebuild; tee full log; propagate real exit code
           set -o pipefail
           xcodebuild \
@@ -67,7 +70,6 @@ jobs:
             -scheme LendicgramVK \
             -configuration Release \
             -sdk "$SDK" \
-            -destination "generic/platform=iOS" \
             -derivedDataPath "$DERIVED" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
