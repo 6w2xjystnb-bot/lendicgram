@@ -132,8 +132,7 @@ struct ChatView: View {
                 .foregroundStyle(Color(.secondaryLabel))
             Spacer()
         }
-        .padding(.horizontal, 16).padding(.vertical, 4)
-        .background(.regularMaterial)
+        .padding(.horizontal, 24).padding(.vertical, 4)
     }
 
     // MARK: - Input Bar
@@ -145,7 +144,7 @@ struct ChatView: View {
                          maxSelectionCount: 10,
                          matching: .any(of: [.images, .videos])) {
                 Image(systemName: "paperclip")
-                    .font(.system(size: 22))
+                    .font(.system(size: 24))
                     .foregroundStyle(Color(.secondaryLabel))
                     .frame(width: 36, height: 36)
             }
@@ -154,19 +153,18 @@ struct ChatView: View {
             HStack(alignment: .bottom) {
                 TextField("Сообщение", text: $input, axis: .vertical)
                     .lineLimit(1...6)
-                    .font(.system(size: 16))
+                    .font(.system(size: 17))
                     .foregroundStyle(Color(.label))
                     .submitLabel(.return)
 
                 Button {
                 } label: {
                     Image(systemName: "face.smiling")
-                        .font(.system(size: 22))
+                        .font(.system(size: 24))
                         .foregroundStyle(Color(.secondaryLabel))
                 }
             }
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22))
+            .padding(.horizontal, 4).padding(.vertical, 8)
 
             // Send / mic
             Button(action: {
@@ -176,24 +174,31 @@ struct ChatView: View {
                     if vm.isSending {
                         ProgressView()
                             .tint(.white)
-                            .frame(width: 34, height: 34)
+                            .frame(width: 36, height: 36)
                     } else {
                         Image(systemName: input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                              ? "mic.fill" : "arrow.up")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 34, height: 34)
+                              ? "mic" : "arrow.up")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color(.secondaryLabel) : .white)
+                            .frame(width: 36, height: 36)
                     }
                 }
                 .background(
                     Circle().fill(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        ? Color(.tertiaryLabel) : tgAccent)
+                        ? Color.clear : tgAccent)
                 )
             }
             .disabled(vm.isSending || input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(.regularMaterial)
+        .padding(.horizontal, 14).padding(.vertical, 10)
+        .background(
+            Color.clear
+                .background(.ultraThinMaterial)
+                .background(Color(.secondarySystemBackground).opacity(0.6))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 28))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
     }
 
     // MARK: - Toolbar
