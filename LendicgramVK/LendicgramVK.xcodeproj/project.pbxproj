@@ -1,0 +1,263 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AA000001 /* LendicgramVKApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100001 /* LendicgramVKApp.swift */; };
+		AA000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100002 /* ContentView.swift */; };
+		AA000003 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100003 /* Models.swift */; };
+		AA000004 /* AvatarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100004 /* AvatarView.swift */; };
+		AA000005 /* FilterChipsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100005 /* FilterChipsView.swift */; };
+		AA000006 /* ChatRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100006 /* ChatRowView.swift */; };
+		AA000007 /* ChatsListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100007 /* ChatsListView.swift */; };
+		AA000008 /* ChatDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100008 /* ChatDetailView.swift */; };
+		AA000009 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA100009 /* ProfileView.swift */; };
+		AA000010 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA100010 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		AA100001 /* LendicgramVKApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/LendicgramVKApp.swift"; sourceTree = "<group>"; };
+		AA100002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/ContentView.swift"; sourceTree = "<group>"; };
+		AA100003 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Models/Models.swift"; sourceTree = "<group>"; };
+		AA100004 /* AvatarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Components/AvatarView.swift"; sourceTree = "<group>"; };
+		AA100005 /* FilterChipsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Chats/FilterChipsView.swift"; sourceTree = "<group>"; };
+		AA100006 /* ChatRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Chats/ChatRowView.swift"; sourceTree = "<group>"; };
+		AA100007 /* ChatsListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Chats/ChatsListView.swift"; sourceTree = "<group>"; };
+		AA100008 /* ChatDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Chat/ChatDetailView.swift"; sourceTree = "<group>"; };
+		AA100009 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/Profile/ProfileView.swift"; sourceTree = "<group>"; };
+		AA100010 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AA200001 /* LendicgramVK.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LendicgramVK.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AA300001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		AA400001 /* LendicgramVK */ = {
+			isa = PBXGroup;
+			children = (
+				AA100001 /* LendicgramVKApp.swift */,
+				AA100002 /* ContentView.swift */,
+				AA100003 /* Models.swift */,
+				AA100004 /* AvatarView.swift */,
+				AA100005 /* FilterChipsView.swift */,
+				AA100006 /* ChatRowView.swift */,
+				AA100007 /* ChatsListView.swift */,
+				AA100008 /* ChatDetailView.swift */,
+				AA100009 /* ProfileView.swift */,
+				AA100010 /* Assets.xcassets */,
+			);
+			path = LendicgramVK;
+			sourceTree = "<group>";
+		};
+		AA400002 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AA200001 /* LendicgramVK.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AA400000 /* root */ = {
+			isa = PBXGroup;
+			children = (
+				AA400001 /* LendicgramVK */,
+				AA400002 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AA500001 /* LendicgramVK */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA600002 /* Build configuration list for PBXNativeTarget "LendicgramVK" */;
+			buildPhases = (
+				AA700001 /* Sources */,
+				AA300001 /* Frameworks */,
+				AA700002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = LendicgramVK;
+			productName = LendicgramVK;
+			productReference = AA200001 /* LendicgramVK.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		AA800001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1800;
+				LastUpgradeCheck = 1800;
+				TargetAttributes = {
+					AA500001 = {
+						CreatedOnToolsVersion = 18.0;
+					};
+				};
+			};
+			buildConfigurationList = AA600001 /* Build configuration list for PBXProject "LendicgramVK" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = ru;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				ru,
+				Base,
+			);
+			mainGroup = AA400000 /* root */;
+			productRefGroup = AA400002 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AA500001 /* LendicgramVK */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AA700002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000010 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AA700001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000001 /* LendicgramVKApp.swift in Sources */,
+				AA000002 /* ContentView.swift in Sources */,
+				AA000003 /* Models.swift in Sources */,
+				AA000004 /* AvatarView.swift in Sources */,
+				AA000005 /* FilterChipsView.swift in Sources */,
+				AA000006 /* ChatRowView.swift in Sources */,
+				AA000007 /* ChatsListView.swift in Sources */,
+				AA000008 /* ChatDetailView.swift in Sources */,
+				AA000009 /* ProfileView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		AA600003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "LendicgramVK";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Нужен для съёмки видеосообщений и фотографий";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Нужен для записи голосовых сообщений";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lendic.LendicgramVK;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		AA600004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "LendicgramVK";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Нужен для съёмки видеосообщений и фотографий";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Нужен для записи голосовых сообщений";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lendic.LendicgramVK;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		AA600005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+			};
+			name = Debug;
+		};
+		AA600006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AA600001 /* Build configuration list for PBXProject "LendicgramVK" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA600005 /* Debug */,
+				AA600006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA600002 /* Build configuration list for PBXNativeTarget "LendicgramVK" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA600003 /* Debug */,
+				AA600004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+	};
+	rootObject = AA800001 /* Project object */;
+}
