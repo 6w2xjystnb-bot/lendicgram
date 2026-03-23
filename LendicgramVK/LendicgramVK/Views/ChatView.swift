@@ -138,7 +138,6 @@ struct ChatView: View {
     // MARK: - Input Bar
 
     var inputBar: some View {
-    var inputBar: some View {
         HStack(alignment: .bottom, spacing: 12) {
             // Attachment / photo picker
             PhotosPicker(selection: $pickerItems,
