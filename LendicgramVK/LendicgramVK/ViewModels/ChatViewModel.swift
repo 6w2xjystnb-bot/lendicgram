@@ -152,6 +152,16 @@ final class ChatViewModel: ObservableObject {
         isSending = false
     }
 
+    func sendPhoto(imageData: Data) async {
+        isSending = true
+        do {
+            let attachment = try await api.uploadPhotoForMessage(peerId: peerId, imageData: imageData)
+            _ = try await api.sendWithAttachment(peerId: peerId, text: "", attachment: attachment)
+            await fetchLatest()
+        } catch { self.error = error.localizedDescription }
+        isSending = false
+    }
+
     // MARK: - Read
 
     func markAsRead() async {

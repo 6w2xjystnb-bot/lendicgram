@@ -99,6 +99,74 @@ final class VKAPIService {
         ])
     }
 
+    // MARK: - Photo Upload
+
+    private struct UploadServerResponse: Decodable {
+        let uploadUrl: String
+        enum CodingKeys: String, CodingKey { case uploadUrl = "upload_url" }
+    }
+
+    private struct PhotoUploadResult: Decodable {
+        let server: Int
+        let photo: String
+        let hash: String
+    }
+
+    /// Full pipeline: get upload URL → multipart upload → save → return attachment string
+    func uploadPhotoForMessage(peerId: Int, imageData: Data) async throws -> String {
+        // 1. Get upload server
+        let serverResp: UploadServerResponse = try await get(
+            "photos.getMessagesUploadServer", ["peer_id": "\(peerId)"])
+
+        guard let uploadURL = URL(string: serverResp.uploadUrl) else {
+            throw VKAPIError.invalidURL
+        }
+
+        // 2. Multipart upload
+        let boundary = "VK-\(UUID().uuidString)"
+        var request = URLRequest(url: uploadURL)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)",
+                         forHTTPHeaderField: "Content-Type")
+
+        var body = Data()
+        let nl = "\r\n".data(using: .utf8)!
+        body += "--\(boundary)\r\n".data(using: .utf8)!
+        body += "Content-Disposition: form-data; name=\"photo\"; filename=\"photo.jpg\"\r\n".data(using: .utf8)!
+        body += "Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!
+        body += imageData
+        body += nl
+        body += "--\(boundary)--\r\n".data(using: .utf8)!
+
+        let (uploadData, _) = try await URLSession.shared.upload(for: request, from: body)
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        let uploadResult = try decoder.decode(PhotoUploadResult.self, from: uploadData)
+
+        // 3. Save photo
+        let saved: [VKPhoto] = try await get("photos.saveMessagesPhoto", [
+            "server": "\(uploadResult.server)",
+            "photo":  uploadResult.photo,
+            "hash":   uploadResult.hash,
+        ])
+
+        guard let photo = saved.first,
+              let photoId  = photo.id,
+              let ownerId  = photo.ownerId else {
+            throw VKAPIError.emptyResponse
+        }
+        return "photo\(ownerId)_\(photoId)"
+    }
+
+    func sendWithAttachment(peerId: Int, text: String, attachment: String) async throws -> Int {
+        try await get("messages.send", [
+            "peer_id":   "\(peerId)",
+            "message":   text,
+            "attachment": attachment,
+            "random_id": "\(Int.random(in: 1...999_999_999))",
+        ])
+    }
+
     // MARK: - Long Poll
 
     func getLongPollServer() async throws -> VKLongPollServer {

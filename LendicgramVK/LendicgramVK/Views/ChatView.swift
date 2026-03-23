@@ -1,11 +1,11 @@
 import SwiftUI
 import AVFoundation
+import PhotosUI
 
-private let accent  = Color(red: 0.35, green: 0.80, blue: 0.52)
-private let bgChat  = Color(red: 0.07, green: 0.10, blue: 0.07)
-private let outBubble = Color(red: 0.20, green: 0.40, blue: 0.26)
-private let inBubble  = Color(red: 0.17, green: 0.20, blue: 0.17)
-private let barBg     = Color(red: 0.10, green: 0.13, blue: 0.10)
+// MARK: - Colors (shared)
+
+private let outBubble = Color(red: 0.24, green: 0.52, blue: 0.88)
+private let inBubble  = Color(.secondarySystemBackground)
 
 // MARK: - Chat View
 
@@ -15,8 +15,8 @@ struct ChatView: View {
 
     @StateObject private var vm: ChatViewModel
     @StateObject private var audioPlayer = AudioPlayerService.shared
-    @State private var input = ""
-    @State private var scrolledToBottom = true
+    @State private var input         = ""
+    @State private var pickerItems: [PhotosPickerItem] = []
     @Environment(\.dismiss) private var dismiss
 
     init(peerId: Int, peerName: String) {
@@ -27,27 +27,29 @@ struct ChatView: View {
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            MathWallpaper().ignoresSafeArea()
+            // Subtle wallpaper
+            TGWallpaper().ignoresSafeArea()
+
             VStack(spacing: 0) {
                 messageList
-                if !vm.typingUserIds.isEmpty {
-                    typingBar
-                }
-                InputBar(text: $input, isSending: vm.isSending) {
-                    Task { await vm.send(text: input); input = "" }
-                }
+                if !vm.typingUserIds.isEmpty { typingBar }
+                inputBar
             }
         }
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar { chatToolbar }
-        .toolbarBackground(barBg.opacity(0.95), for: .navigationBar)
+        .toolbarBackground(.regularMaterial, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
+        .tint(tgAccent)
         .alert("Ошибка", isPresented: .constant(vm.error != nil)) {
             Button("OK") { vm.error = nil }
         } message: { Text(vm.error ?? "") }
         .task { await vm.load() }
+        .onChange(of: pickerItems) { _, items in
+            Task { await handlePickedItems(items) }
+        }
     }
 
     // MARK: - Message List
@@ -56,43 +58,40 @@ struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 3) {
-                    // Load more
                     if vm.hasMore {
                         Button { Task { await vm.loadMore() } } label: {
                             if vm.isLoading {
-                                ProgressView().tint(accent).padding()
+                                ProgressView().tint(tgAccent).padding()
                             } else {
                                 Text("Загрузить ранее")
                                     .font(.system(size: 13))
-                                    .foregroundColor(accent)
+                                    .foregroundStyle(tgAccent)
                                     .padding(10)
                             }
                         }
                     } else if vm.isLoading {
-                        ProgressView().tint(accent).padding()
+                        ProgressView().tint(tgAccent).padding()
                     }
 
                     ForEach(Array(vm.messages.enumerated()), id: \.element.id) { index, msg in
-                        // Date separator
                         if vm.shouldShowDate(at: index) {
                             dateSeparator(msg.date)
                         }
-
                         if msg.isService {
                             ServiceBubble(msg: msg, profiles: vm.profiles)
                         } else {
                             BubbleView(
-                                msg: msg,
-                                profiles: vm.profiles,
-                                isRead: vm.isRead(msg),
-                                showSender: vm.isGroupChat && !msg.isOutgoing,
+                                msg:         msg,
+                                profiles:    vm.profiles,
+                                isRead:      vm.isRead(msg),
+                                showSender:  vm.isGroupChat && !msg.isOutgoing,
                                 audioPlayer: audioPlayer
                             )
                             .id(msg.id)
                         }
                     }
                 }
-                .padding(.horizontal, 10).padding(.vertical, 6)
+                .padding(.horizontal, 10).padding(.vertical, 8)
             }
             .onChange(of: vm.messages.count) { _, _ in
                 if let last = vm.messages.last {
@@ -116,9 +115,9 @@ struct ChatView: View {
     func dateSeparator(_ ts: Int) -> some View {
         Text(ts.vkDateSeparator)
             .font(.system(size: 13, weight: .medium))
-            .foregroundColor(Color(white: 0.6))
+            .foregroundStyle(Color(.secondaryLabel))
             .padding(.horizontal, 14).padding(.vertical, 5)
-            .background(Capsule().fill(Color.black.opacity(0.35)))
+            .background(.thinMaterial, in: Capsule())
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
     }
@@ -129,14 +128,74 @@ struct ChatView: View {
         HStack(spacing: 6) {
             TypingDots()
             let names = vm.typingUserIds.compactMap { vm.profiles[$0]?.firstName }
-            let text = names.isEmpty ? "печатает..." : "\(names.joined(separator: ", ")) печатает..."
+            let text  = names.isEmpty ? "печатает..." : "\(names.joined(separator: ", ")) печатает..."
             Text(text)
                 .font(.system(size: 13))
-                .foregroundColor(Color(white: 0.5))
+                .foregroundStyle(Color(.secondaryLabel))
             Spacer()
         }
         .padding(.horizontal, 16).padding(.vertical, 4)
-        .background(barBg)
+        .background(.regularMaterial)
+    }
+
+    // MARK: - Input Bar
+
+    var inputBar: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            // Attachment / photo picker
+            PhotosPicker(selection: $pickerItems,
+                         maxSelectionCount: 10,
+                         matching: .any(of: [.images, .videos])) {
+                Image(systemName: "paperclip")
+                    .font(.system(size: 22))
+                    .foregroundStyle(Color(.secondaryLabel))
+                    .frame(width: 36, height: 36)
+            }
+
+            // Text field with emoji
+            HStack(alignment: .bottom) {
+                TextField("Сообщение", text: $input, axis: .vertical)
+                    .lineLimit(1...6)
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color(.label))
+                    .submitLabel(.return)
+
+                Button {
+                } label: {
+                    Image(systemName: "face.smiling")
+                        .font(.system(size: 22))
+                        .foregroundStyle(Color(.secondaryLabel))
+                }
+            }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22))
+
+            // Send / mic
+            Button(action: {
+                Task { await vm.send(text: input); input = "" }
+            }) {
+                Group {
+                    if vm.isSending {
+                        ProgressView()
+                            .tint(.white)
+                            .frame(width: 34, height: 34)
+                    } else {
+                        Image(systemName: input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                              ? "mic.fill" : "arrow.up")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 34, height: 34)
+                    }
+                }
+                .background(
+                    Circle().fill(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        ? Color(.tertiaryLabel) : tgAccent)
+                )
+            }
+            .disabled(vm.isSending || input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(.regularMaterial)
     }
 
     // MARK: - Toolbar
@@ -145,41 +204,53 @@ struct ChatView: View {
     var chatToolbar: some ToolbarContent {
         ToolbarItem(placement: .navigationBarLeading) {
             Button { dismiss() } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "chevron.left").font(.system(size: 17, weight: .semibold))
-                    Text("Чаты").font(.system(size: 17))
+                HStack(spacing: 2) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 17, weight: .semibold))
+                    Text("Назад").font(.system(size: 17))
                 }
-                .foregroundColor(accent)
+                .foregroundStyle(tgAccent)
             }
         }
         ToolbarItem(placement: .principal) {
             VStack(spacing: 1) {
                 Text(peerName)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
+                    .foregroundStyle(Color(.label))
                     .lineLimit(1)
                 Group {
                     if !vm.typingUserIds.isEmpty {
                         Text("печатает...")
+                            .foregroundStyle(tgAccent)
                     } else if let u = vm.peerUser {
                         Text(u.isOnline ? (u.isMobile ? "в сети с телефона" : "в сети") : u.statusText)
+                            .foregroundStyle(u.isOnline ? tgAccent : Color(.secondaryLabel))
                     } else if vm.isGroupChat {
                         Text("беседа")
-                    } else {
-                        Text("")
+                            .foregroundStyle(Color(.secondaryLabel))
                     }
                 }
                 .font(.system(size: 12))
-                .foregroundColor(vm.peerUser?.isOnline == true || !vm.typingUserIds.isEmpty ? accent : Color(white: 0.5))
             }
         }
         ToolbarItem(placement: .navigationBarTrailing) {
-            VKAvatarView(url: nil, name: peerName, size: 34)
+            VKAvatarView(url: vm.peerUser?.avatarURL, name: peerName, size: 34)
         }
+    }
+
+    // MARK: - Photo Handling
+
+    private func handlePickedItems(_ items: [PhotosPickerItem]) async {
+        for item in items {
+            if let data = try? await item.loadTransferable(type: Data.self) {
+                await vm.sendPhoto(imageData: data)
+            }
+        }
+        pickerItems = []
     }
 }
 
-// MARK: - Service Message Bubble
+// MARK: - Service Bubble
 
 struct ServiceBubble: View {
     let msg: VKAPIMessage
@@ -188,31 +259,31 @@ struct ServiceBubble: View {
     var body: some View {
         Text(text)
             .font(.system(size: 13))
-            .foregroundColor(Color(white: 0.55))
+            .foregroundStyle(Color(.secondaryLabel))
             .multilineTextAlignment(.center)
             .padding(.horizontal, 14).padding(.vertical, 5)
-            .background(Capsule().fill(Color.black.opacity(0.25)))
+            .background(.thinMaterial, in: Capsule())
             .frame(maxWidth: .infinity)
             .padding(.vertical, 4)
     }
 
     var text: String {
         guard let action = msg.action else { return "" }
-        let name = profiles[msg.fromId]?.firstName ?? ""
+        let name       = profiles[msg.fromId]?.firstName ?? ""
         let memberName = profiles[action.memberId ?? 0]?.firstName ?? ""
         switch action.type {
-        case "chat_create":          return "\(name) создал беседу «\(action.text ?? "")»"
+        case "chat_create":         return "\(name) создал беседу «\(action.text ?? "")»"
         case "chat_invite_user":
             if action.memberId == msg.fromId { return "\(name) вернулся в беседу" }
             return "\(name) пригласил \(memberName)"
         case "chat_kick_user":
             if action.memberId == msg.fromId { return "\(name) покинул беседу" }
             return "\(name) исключил \(memberName)"
-        case "chat_title_update":    return "\(name) изменил название на «\(action.text ?? "")»"
-        case "chat_photo_update":    return "\(name) обновил фото беседы"
-        case "chat_pin_message":     return "\(name) закрепил сообщение"
-        case "chat_unpin_message":   return "\(name) открепил сообщение"
-        default:                     return action.type
+        case "chat_title_update":   return "\(name) изменил название на «\(action.text ?? "")»"
+        case "chat_photo_update":   return "\(name) обновил фото беседы"
+        case "chat_pin_message":    return "\(name) закрепил сообщение"
+        case "chat_unpin_message":  return "\(name) открепил сообщение"
+        default:                    return action.type
         }
     }
 }
@@ -220,37 +291,34 @@ struct ServiceBubble: View {
 // MARK: - Bubble View
 
 struct BubbleView: View {
-    let msg: VKAPIMessage
-    let profiles: [Int: VKUser]
-    let isRead: Bool
-    let showSender: Bool
+    let msg:         VKAPIMessage
+    let profiles:    [Int: VKUser]
+    let isRead:      Bool
+    let showSender:  Bool
     let audioPlayer: AudioPlayerService
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 6) {
-            if msg.isOutgoing { Spacer(minLength: 44) }
-
+            if msg.isOutgoing { Spacer(minLength: 52) }
             if !msg.isOutgoing {
                 VKAvatarView(
-                    url: profiles[msg.fromId]?.avatarURL,
+                    url:  profiles[msg.fromId]?.avatarURL,
                     name: profiles[msg.fromId]?.fullName ?? "?",
-                    size: 28
+                    size: 30
                 )
             }
 
             VStack(alignment: msg.isOutgoing ? .trailing : .leading, spacing: 2) {
-                // Sender name in group chats
                 if showSender {
                     Text(profiles[msg.fromId]?.firstName ?? "")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(senderColor(msg.fromId))
+                        .foregroundStyle(senderColor(msg.fromId))
                         .padding(.horizontal, 12)
                 }
-
                 bubble
             }
 
-            if !msg.isOutgoing { Spacer(minLength: 44) }
+            if !msg.isOutgoing { Spacer(minLength: 52) }
         }
         .padding(.vertical, 1)
     }
@@ -259,39 +327,29 @@ struct BubbleView: View {
 
     @ViewBuilder
     var bubble: some View {
-        // Reply + content
-        let hasReply = msg.replyMessage != nil
-        let hasFwd   = !(msg.fwdMessages ?? []).isEmpty
-
         if let sticker = msg.attachments?.first(where: { $0.type == "sticker" })?.sticker {
-            // Sticker — no bubble
-            VStack(alignment: msg.isOutgoing ? .trailing : .leading) {
+            VStack(alignment: msg.isOutgoing ? .trailing : .leading, spacing: 2) {
                 stickerView(sticker)
                 timeAndCheck.padding(.horizontal, 4)
             }
         } else {
-            VStack(alignment: .leading, spacing: 4) {
-                if hasReply, let reply = msg.replyMessage {
+            VStack(alignment: .leading, spacing: 6) {
+                if let reply = msg.replyMessage {
                     replyPreview(reply)
                 }
-
-                if hasFwd {
-                    fwdPreview(msg.fwdMessages!)
+                if let fwds = msg.fwdMessages, !fwds.isEmpty {
+                    fwdPreview(fwds)
                 }
-
-                // Attachments
                 if let atts = msg.attachments, !atts.isEmpty {
                     ForEach(Array(atts.enumerated()), id: \.offset) { _, att in
                         attachmentView(att)
                     }
                 }
-
-                // Text + time row
-                if !msg.text.isEmpty || (!hasReply && (msg.attachments ?? []).isEmpty && !hasFwd) {
-                    HStack(alignment: .bottom, spacing: 4) {
+                if !msg.text.isEmpty || (msg.attachments == nil && msg.replyMessage == nil && (msg.fwdMessages ?? []).isEmpty) {
+                    HStack(alignment: .bottom, spacing: 6) {
                         Text(msg.text.isEmpty ? " " : msg.text)
                             .font(.system(size: 16))
-                            .foregroundColor(.white)
+                            .foregroundStyle(msg.isOutgoing ? Color.white : Color(.label))
                         Spacer(minLength: 0)
                         metaInfo
                     }
@@ -300,33 +358,38 @@ struct BubbleView: View {
                 }
             }
             .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 18)
-                    .fill(msg.isOutgoing ? outBubble : inBubble)
-            )
+            .background(bubbleBg, in: bubbleShape)
         }
     }
 
-    // MARK: - Meta (time + edited + read)
-
-    var metaInfo: some View {
-        timeAndCheck.padding(.bottom, 1)
+    private var bubbleBg: some ShapeStyle {
+        msg.isOutgoing
+            ? AnyShapeStyle(outBubble)
+            : AnyShapeStyle(Color(.secondarySystemBackground))
     }
+
+    private var bubbleShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 18)
+    }
+
+    // MARK: - Meta
+
+    var metaInfo: some View { timeAndCheck.padding(.bottom, 1) }
 
     var timeAndCheck: some View {
         HStack(spacing: 3) {
             if msg.isEdited {
                 Text("ред.")
                     .font(.system(size: 10))
-                    .foregroundColor(Color(white: 0.45))
+                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.75) : Color(.tertiaryLabel))
             }
             Text(msg.date.vkTime)
                 .font(.system(size: 11))
-                .foregroundColor(Color(white: 0.55))
+                .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.75) : Color(.secondaryLabel))
             if msg.isOutgoing {
-                Image(systemName: isRead ? "checkmark.circle" : "checkmark")
+                Image(systemName: isRead ? "checkmark.circle.fill" : "checkmark")
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(isRead ? accent : Color(white: 0.55))
+                    .foregroundStyle(isRead ? Color.white : Color.white.opacity(0.65))
             }
         }
     }
@@ -335,20 +398,21 @@ struct BubbleView: View {
 
     func replyPreview(_ reply: VKReplyMessage) -> some View {
         HStack(spacing: 6) {
-            RoundedRectangle(cornerRadius: 1.5)
-                .fill(accent)
-                .frame(width: 3, height: 32)
+            RoundedRectangle(cornerRadius: 2)
+                .fill(msg.isOutgoing ? Color.white.opacity(0.8) : tgAccent)
+                .frame(width: 3)
             VStack(alignment: .leading, spacing: 1) {
                 Text(profiles[reply.fromId]?.firstName ?? "")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(accent)
+                    .foregroundStyle(msg.isOutgoing ? Color.white : tgAccent)
                     .lineLimit(1)
                 Text(reply.text.isEmpty ? attachmentLabel(reply.attachments) : reply.text)
                     .font(.system(size: 13))
-                    .foregroundColor(Color(white: 0.6))
+                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.8) : Color(.secondaryLabel))
                     .lineLimit(1)
             }
         }
+        .frame(minHeight: 32)
     }
 
     // MARK: - Forward
@@ -357,17 +421,17 @@ struct BubbleView: View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(fwds) { fwd in
                 HStack(spacing: 6) {
-                    RoundedRectangle(cornerRadius: 1.5)
-                        .fill(Color(white: 0.4))
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color(.tertiaryLabel))
                         .frame(width: 2)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(profiles[fwd.fromId]?.firstName ?? "Пересланное")
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(Color(white: 0.7))
+                            .foregroundStyle(msg.isOutgoing ? Color.white : Color(.label))
                             .lineLimit(1)
                         Text(fwd.text.isEmpty ? attachmentLabel(fwd.attachments) : fwd.text)
                             .font(.system(size: 14))
-                            .foregroundColor(.white)
+                            .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.85) : Color(.label))
                             .lineLimit(3)
                     }
                 }
@@ -393,8 +457,10 @@ struct BubbleView: View {
         case "poll":          pollView(att.poll)
         default:
             HStack(spacing: 6) {
-                Image(systemName: "paperclip").foregroundColor(accent)
-                Text(att.type).foregroundColor(Color(white: 0.6))
+                Image(systemName: "paperclip")
+                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.8) : tgAccent)
+                Text(att.type)
+                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.7) : Color(.secondaryLabel))
             }
         }
     }
@@ -404,19 +470,17 @@ struct BubbleView: View {
     func photoView(_ photo: VKPhoto?) -> some View {
         if let url = photo?.bestURL {
             let ratio = photo?.aspectRatio ?? 1.0
-            let w: CGFloat = min(260, max(120, 260))
+            let w: CGFloat = 240
             let h: CGFloat = min(300, max(80, w / ratio))
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let img):
-                    img.resizable().scaledToFill()
-                        .frame(maxWidth: w, maxHeight: h).clipped()
-                default:
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(white: 0.15))
-                        .frame(width: w, height: h)
-                        .overlay(ProgressView().tint(accent))
-                }
+            CachedAsyncImage(url: url) { img in
+                img.resizable().scaledToFill()
+                    .frame(maxWidth: w, maxHeight: h)
+                    .clipped()
+            } placeholder: {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.tertiarySystemBackground))
+                    .frame(width: w, height: h)
+                    .overlay(ProgressView().tint(tgAccent))
             }
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
@@ -427,116 +491,117 @@ struct BubbleView: View {
     func videoView(_ video: VKVideo?) -> some View {
         ZStack(alignment: .bottomLeading) {
             if let url = video?.thumbURL {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let img):
-                        img.resizable().scaledToFill()
-                            .frame(width: 240, height: 160).clipped()
-                    default:
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(white: 0.15))
-                            .frame(width: 240, height: 160)
-                    }
+                CachedAsyncImage(url: url) { img in
+                    img.resizable().scaledToFill()
+                        .frame(width: 240, height: 160).clipped()
+                } placeholder: {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(.tertiarySystemBackground))
+                        .frame(width: 240, height: 160)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             } else {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(white: 0.15))
+                    .fill(Color(.tertiarySystemBackground))
                     .frame(width: 240, height: 160)
             }
             // Play button
             Circle()
-                .fill(Color.black.opacity(0.5))
-                .frame(width: 44, height: 44)
-                .overlay(Image(systemName: "play.fill").foregroundColor(.white).font(.system(size: 18)))
+                .fill(Color.black.opacity(0.45))
+                .frame(width: 48, height: 48)
+                .overlay(
+                    Image(systemName: "play.fill")
+                        .foregroundStyle(.white)
+                        .font(.system(size: 18))
+                )
                 .position(x: 120, y: 80)
-            // Duration
+            // Duration badge
             if let d = video?.durationFormatted, !d.isEmpty {
                 Text(d)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Capsule().fill(Color.black.opacity(0.6)))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6).padding(.vertical, 3)
+                    .background(Capsule().fill(Color.black.opacity(0.55)))
                     .padding(8)
             }
         }
         if let title = video?.title, !title.isEmpty {
             Text(title)
                 .font(.system(size: 14))
-                .foregroundColor(accent)
+                .foregroundStyle(msg.isOutgoing ? Color.white : tgAccent)
                 .lineLimit(2)
         }
     }
 
-    // Voice message with waveform
+    // Voice message
     func voiceView(_ audio: VKAudioMessage?) -> some View {
-        HStack(spacing: 8) {
-            let url = audio?.linkMp3 ?? audio?.linkOgg ?? ""
-            let playing = audioPlayer.currentURL == url && audioPlayer.isPlaying
+        let url     = audio?.linkMp3 ?? audio?.linkOgg ?? ""
+        let playing = audioPlayer.currentURL == url && audioPlayer.isPlaying
 
+        return HStack(spacing: 10) {
             Button { audioPlayer.toggle(url: url) } label: {
-                Image(systemName: playing ? "pause.fill" : "play.fill")
-                    .font(.system(size: 18))
-                    .foregroundColor(accent)
-                    .frame(width: 32, height: 32)
+                Image(systemName: playing ? "pause.circle.fill" : "play.circle.fill")
+                    .font(.system(size: 36))
+                    .foregroundStyle(msg.isOutgoing ? Color.white : tgAccent)
             }
-
-            // Waveform
-            WaveformView(
-                waveform: audio?.waveform ?? [],
-                progress: audioPlayer.currentURL == url ? audioPlayer.progress : 0
-            )
-            .frame(height: 24)
-            .frame(maxWidth: 140)
-
-            Text(formatDuration(audio?.duration ?? 0))
-                .font(.system(size: 13))
-                .foregroundColor(Color(white: 0.6))
-                .monospacedDigit()
+            VStack(alignment: .leading, spacing: 4) {
+                WaveformView(
+                    waveform: audio?.waveform ?? [],
+                    progress: audioPlayer.currentURL == url ? audioPlayer.progress : 0,
+                    tint:     msg.isOutgoing ? Color.white : tgAccent
+                )
+                .frame(height: 22)
+                .frame(maxWidth: 140)
+                Text(formatDuration(audio?.duration ?? 0))
+                    .font(.system(size: 12))
+                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.75) : Color(.secondaryLabel))
+                    .monospacedDigit()
+            }
         }
     }
 
-    // Video message (кружок)
+    // Video message (circle / кружок)
     @ViewBuilder
-    func videoMessageView(_ vm: VKVideoMessage?) -> some View {
-        ZStack(alignment: .bottomTrailing) {
-            if let url = vm?.previewURL {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let img):
-                        img.resizable().scaledToFill()
-                            .frame(width: 200, height: 200)
-                            .clipShape(Circle())
-                    default:
-                        Circle()
-                            .fill(Color(white: 0.15))
-                            .frame(width: 200, height: 200)
-                            .overlay(ProgressView().tint(accent))
-                    }
+    func videoMessageView(_ vmsg: VKVideoMessage?) -> some View {
+        ZStack {
+            if let url = vmsg?.previewURL {
+                CachedAsyncImage(url: url) { img in
+                    img.resizable().scaledToFill()
+                        .frame(width: 200, height: 200)
+                        .clipShape(Circle())
+                } placeholder: {
+                    Circle()
+                        .fill(Color(.tertiarySystemBackground))
+                        .frame(width: 200, height: 200)
+                        .overlay(ProgressView().tint(tgAccent))
                 }
             } else {
                 Circle()
-                    .fill(Color(white: 0.15))
+                    .fill(Color(.tertiarySystemBackground))
                     .frame(width: 200, height: 200)
                     .overlay(
                         Image(systemName: "video.circle")
-                            .font(.system(size: 40))
-                            .foregroundColor(Color(white: 0.4))
+                            .font(.system(size: 44))
+                            .foregroundStyle(Color(.secondaryLabel))
                     )
             }
-            // Play overlay
+            // Frosted play overlay
             Circle()
-                .fill(Color.black.opacity(0.3))
+                .fill(Color.black.opacity(0.25))
                 .frame(width: 200, height: 200)
                 .overlay(
                     Image(systemName: "play.fill")
-                        .font(.system(size: 32))
-                        .foregroundColor(.white.opacity(0.8))
+                        .font(.system(size: 36))
+                        .foregroundStyle(.white.opacity(0.85))
                 )
-                .opacity(0.5)
-            // Duration badge
+        }
+        .overlay(alignment: .bottomTrailing) {
             HStack(spacing: 3) {
-                if let d = vm?.duration { Text(formatDuration(d)).font(.system(size: 11)).foregroundColor(.white) }
+                if let d = vmsg?.duration {
+                    Text(formatDuration(d))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white)
+                }
                 timeAndCheck
             }
             .padding(.horizontal, 8).padding(.vertical, 4)
@@ -550,72 +615,72 @@ struct BubbleView: View {
         HStack(spacing: 10) {
             ZStack {
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(accent.opacity(0.15))
+                    .fill(tgAccent.opacity(0.15))
                     .frame(width: 44, height: 44)
                 Image(systemName: docIcon(doc?.ext))
-                    .font(.system(size: 20))
-                    .foregroundColor(accent)
+                    .font(.system(size: 22))
+                    .foregroundStyle(tgAccent)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(doc?.displayTitle ?? "Документ")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white)
+                    .foregroundStyle(msg.isOutgoing ? Color.white : Color(.label))
                     .lineLimit(1)
                 Text("\(doc?.ext?.uppercased() ?? "") · \(doc?.sizeFormatted ?? "")")
                     .font(.system(size: 12))
-                    .foregroundColor(Color(white: 0.5))
+                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.7) : Color(.secondaryLabel))
             }
         }
     }
 
-    // Audio
+    // Audio track
     func audioView(_ audio: VKAudio?) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "music.note")
-                .font(.system(size: 20))
-                .foregroundColor(accent)
-                .frame(width: 36, height: 36)
-                .background(Circle().fill(accent.opacity(0.15)))
+                .font(.system(size: 18))
+                .foregroundStyle(msg.isOutgoing ? Color.white : tgAccent)
+                .frame(width: 38, height: 38)
+                .background(
+                    Circle().fill(msg.isOutgoing ? Color.white.opacity(0.15) : tgAccent.opacity(0.15))
+                )
             VStack(alignment: .leading, spacing: 2) {
                 Text(audio?.title ?? "Аудио")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white)
+                    .foregroundStyle(msg.isOutgoing ? Color.white : Color(.label))
                     .lineLimit(1)
                 Text(audio?.artist ?? "")
                     .font(.system(size: 12))
-                    .foregroundColor(Color(white: 0.5))
+                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.7) : Color(.secondaryLabel))
                     .lineLimit(1)
             }
             Spacer()
             Text(audio?.durationFormatted ?? "")
                 .font(.system(size: 12))
-                .foregroundColor(Color(white: 0.5))
+                .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.7) : Color(.secondaryLabel))
                 .monospacedDigit()
         }
     }
 
-    // Link
+    // Link preview
     func linkView(_ link: VKLink?) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             if let photo = link?.photo, let url = photo.thumbURL {
-                AsyncImage(url: url) { phase in
-                    if case .success(let img) = phase {
-                        img.resizable().scaledToFill()
-                            .frame(height: 120).clipped()
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                }
+                CachedAsyncImage(url: url) { img in
+                    img.resizable().scaledToFill()
+                        .frame(height: 120).clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } placeholder: { EmptyView() }
             }
             if let title = link?.title, !title.isEmpty {
                 Text(title)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(accent)
+                    .foregroundStyle(msg.isOutgoing ? Color.white : tgAccent)
                     .lineLimit(2)
             }
-            if let caption = link?.caption, !caption.isEmpty {
-                Text(caption)
+            if let cap = link?.caption, !cap.isEmpty {
+                Text(cap)
                     .font(.system(size: 12))
-                    .foregroundColor(Color(white: 0.5))
+                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.7) : Color(.secondaryLabel))
                     .lineLimit(1)
             }
         }
@@ -626,15 +691,15 @@ struct BubbleView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Image(systemName: "doc.richtext")
-                    .foregroundColor(accent)
+                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.8) : tgAccent)
                 Text("Запись на стене")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(accent)
+                    .foregroundStyle(msg.isOutgoing ? Color.white : tgAccent)
             }
             if let text = wall?.text, !text.isEmpty {
                 Text(text)
                     .font(.system(size: 14))
-                    .foregroundColor(.white)
+                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.9) : Color(.label))
                     .lineLimit(4)
             }
         }
@@ -644,12 +709,10 @@ struct BubbleView: View {
     @ViewBuilder
     func graffitiView(_ graffiti: VKGraffiti?) -> some View {
         if let url = graffiti?.imageURL {
-            AsyncImage(url: url) { phase in
-                if case .success(let img) = phase {
-                    img.resizable().scaledToFit()
-                        .frame(maxWidth: 200, maxHeight: 200)
-                }
-            }
+            CachedAsyncImage(url: url) { img in
+                img.resizable().scaledToFit()
+                    .frame(maxWidth: 200, maxHeight: 200)
+            } placeholder: { EmptyView() }
         }
     }
 
@@ -657,17 +720,15 @@ struct BubbleView: View {
     @ViewBuilder
     func giftView(_ gift: VKGift?) -> some View {
         if let url = gift?.thumbURL {
-            AsyncImage(url: url) { phase in
-                if case .success(let img) = phase {
-                    img.resizable().scaledToFit()
-                        .frame(width: 140, height: 140)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-            }
+            CachedAsyncImage(url: url) { img in
+                img.resizable().scaledToFit()
+                    .frame(width: 140, height: 140)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            } placeholder: { EmptyView() }
         } else {
             HStack {
-                Image(systemName: "gift.fill").foregroundColor(accent)
-                Text("Подарок").foregroundColor(.white)
+                Image(systemName: "gift.fill").foregroundStyle(tgAccent)
+                Text("Подарок").foregroundStyle(msg.isOutgoing ? Color.white : Color(.label))
             }
         }
     }
@@ -676,25 +737,26 @@ struct BubbleView: View {
     func pollView(_ poll: VKPoll?) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Image(systemName: "chart.bar").foregroundColor(accent)
+                Image(systemName: "chart.bar.fill")
+                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.8) : tgAccent)
                 Text(poll?.question ?? "Опрос")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white)
+                    .foregroundStyle(msg.isOutgoing ? Color.white : Color(.label))
             }
             ForEach(poll?.answers ?? []) { answer in
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
                         Text(answer.text ?? "")
                             .font(.system(size: 13))
-                            .foregroundColor(.white)
+                            .foregroundStyle(msg.isOutgoing ? Color.white : Color(.label))
                         Spacer()
                         Text("\(answer.votes ?? 0)")
                             .font(.system(size: 12))
-                            .foregroundColor(Color(white: 0.5))
+                            .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.7) : Color(.secondaryLabel))
                     }
                     GeometryReader { g in
                         RoundedRectangle(cornerRadius: 2)
-                            .fill(accent.opacity(0.3))
+                            .fill(msg.isOutgoing ? Color.white.opacity(0.4) : tgAccent.opacity(0.35))
                             .frame(width: g.size.width * (answer.rate ?? 0) / 100)
                     }
                     .frame(height: 3)
@@ -702,19 +764,20 @@ struct BubbleView: View {
             }
             Text("\(poll?.votes ?? 0) голосов")
                 .font(.system(size: 12))
-                .foregroundColor(Color(white: 0.5))
+                .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.7) : Color(.secondaryLabel))
         }
     }
 
-    // Sticker
+    // Sticker — transparent, no bubble background
     @ViewBuilder
     func stickerView(_ sticker: VKSticker) -> some View {
         if let url = sticker.bestURL {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let img): img.resizable().scaledToFit().frame(width: 150, height: 150)
-                default: Color.clear.frame(width: 150, height: 150)
-                }
+            CachedAsyncImage(url: url) { img in
+                img.resizable().scaledToFit()
+                    .frame(width: 160, height: 160)
+                    .allowsHitTesting(false)
+            } placeholder: {
+                Color.clear.frame(width: 160, height: 160)
             }
         } else {
             Text("🎭").font(.system(size: 80))
@@ -742,21 +805,19 @@ struct BubbleView: View {
     }
 
     func senderColor(_ fromId: Int) -> Color {
-        let hue = Double(abs(fromId) % 360) / 360.0
-        return Color(hue: hue, saturation: 0.6, brightness: 0.85)
+        Color(hue: Double(abs(fromId) % 360) / 360.0, saturation: 0.6, brightness: 0.75)
     }
 
     func docIcon(_ ext: String?) -> String {
         switch ext?.lowercased() {
-        case "pdf":                         return "doc.fill"
-        case "doc", "docx":                 return "doc.text.fill"
-        case "xls", "xlsx":                 return "tablecells.fill"
-        case "ppt", "pptx":                 return "rectangle.fill.on.rectangle.fill"
-        case "zip", "rar", "7z", "tar":     return "archivebox.fill"
-        case "mp3", "ogg", "wav", "flac":   return "music.note"
-        case "mp4", "avi", "mkv", "mov":    return "film.fill"
-        case "jpg", "jpeg", "png", "gif":   return "photo.fill"
-        default:                            return "doc.fill"
+        case "pdf":                       return "doc.fill"
+        case "doc", "docx":              return "doc.text.fill"
+        case "xls", "xlsx":              return "tablecells.fill"
+        case "zip", "rar", "7z":         return "archivebox.fill"
+        case "mp3", "ogg", "wav":        return "music.note"
+        case "mp4", "avi", "mkv", "mov": return "film.fill"
+        case "jpg", "jpeg", "png", "gif": return "photo.fill"
+        default:                          return "doc.fill"
         }
     }
 
@@ -765,11 +826,12 @@ struct BubbleView: View {
     }
 }
 
-// MARK: - Waveform View
+// MARK: - Waveform
 
 struct WaveformView: View {
     let waveform: [Int]
     let progress: Double
+    var tint: Color = tgAccent
 
     var body: some View {
         GeometryReader { g in
@@ -778,7 +840,7 @@ struct WaveformView: View {
                 ForEach(Array(bars.enumerated()), id: \.offset) { i, h in
                     let filled = Double(i) / Double(max(bars.count - 1, 1)) <= progress
                     RoundedRectangle(cornerRadius: 1)
-                        .fill(filled ? accent : accent.opacity(0.35))
+                        .fill(filled ? tint : tint.opacity(0.35))
                         .frame(width: 2.5, height: max(2, h * g.size.height))
                 }
             }
@@ -786,22 +848,19 @@ struct WaveformView: View {
         }
     }
 
-    func normalizedBars(width: CGFloat) -> [CGFloat] {
+    private func normalizedBars(width: CGFloat) -> [CGFloat] {
         let count = max(1, Int(width / 4))
         guard !waveform.isEmpty else { return Array(repeating: 0.1, count: count) }
         let maxVal = CGFloat(waveform.max() ?? 1)
-        // Resample
-        var result: [CGFloat] = []
-        for i in 0..<count {
+        return (0..<count).map { i in
             let idx = Int(Double(i) / Double(count) * Double(waveform.count))
             let val = idx < waveform.count ? CGFloat(waveform[idx]) / maxVal : 0.1
-            result.append(max(0.08, val))
+            return max(0.08, val)
         }
-        return result
     }
 }
 
-// MARK: - Typing Dots Animation
+// MARK: - Typing Dots
 
 struct TypingDots: View {
     @State private var phase = 0
@@ -810,96 +869,38 @@ struct TypingDots: View {
         HStack(spacing: 3) {
             ForEach(0..<3, id: \.self) { i in
                 Circle()
-                    .fill(Color(white: 0.5))
+                    .fill(Color(.secondaryLabel))
                     .frame(width: 5, height: 5)
-                    .offset(y: phase == i ? -3 : 0)
+                    .scaleEffect(phase == i ? 1.3 : 0.9)
+                    .animation(.easeInOut(duration: 0.4).repeatForever().delay(Double(i) * 0.15),
+                               value: phase)
             }
         }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 0.35).repeatForever(autoreverses: true)) { phase = 0 }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(.easeInOut(duration: 0.35).repeatForever(autoreverses: true)) { phase = 1 }
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                withAnimation(.easeInOut(duration: 0.35).repeatForever(autoreverses: true)) { phase = 2 }
-            }
-        }
+        .onAppear { phase = 0 }
     }
 }
 
-// MARK: - Input Bar
+// MARK: - Telegram-style Wallpaper
 
-struct InputBar: View {
-    @Binding var text: String
-    let isSending: Bool
-    let onSend: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Button { } label: {
-                Image(systemName: "paperclip")
-                    .font(.system(size: 22))
-                    .foregroundColor(Color(white: 0.5))
-            }
-            HStack {
-                TextField("", text: $text,
-                          prompt: Text("Сообщение").foregroundColor(Color(white: 0.30)))
-                    .foregroundColor(.white)
-                Button { } label: {
-                    Image(systemName: "face.smiling")
-                        .font(.system(size: 22))
-                        .foregroundColor(Color(white: 0.5))
-                }
-            }
-            .padding(.horizontal, 12).padding(.vertical, 9)
-            .background(RoundedRectangle(cornerRadius: 22).fill(Color(white: 0.14)))
-
-            Button(action: onSend) {
-                Group {
-                    if isSending {
-                        ProgressView().tint(accent).frame(width: 26, height: 26)
-                    } else {
-                        Image(systemName: text.isEmpty ? "mic" : "arrow.up.circle.fill")
-                            .font(.system(size: 28))
-                            .foregroundColor(text.isEmpty ? Color(white: 0.5) : accent)
-                    }
-                }
-            }
-            .disabled(isSending || text.trimmingCharacters(in: .whitespaces).isEmpty)
-        }
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(barBg.opacity(0.97))
-    }
-}
-
-// MARK: - Math Wallpaper
-
-struct MathWallpaper: View {
-    private let formulas = [
-        "a_n=a₁+d(n-1)", "sin²x+cos²x=1", "∫eˣdx=eˣ+C",
-        "∑(n→∞)", "π≈3.14159", "√(a²+b²)=c", "y=ctg(x)",
-        "tg(−x)=−tg(x)", "log_a(b·c)", "x₁+x₂=−b/a",
-        "e≈2.71828", "4x+(a+b)²", "limₓ→₀ sinx/x=1",
-        "d/dx(eˣ)=eˣ", "∫₀^π sinx dx=2",
-    ]
+struct TGWallpaper: View {
     var body: some View {
         GeometryReader { g in
             ZStack {
-                Color(red: 0.07, green: 0.09, blue: 0.07)
+                Color(.systemGroupedBackground)
                 Canvas { ctx, size in
-                    let cols = 4; let cw = size.width / CGFloat(cols)
-                    let rh = size.height / CGFloat(formulas.count)
-                    for (r, f) in formulas.enumerated() {
-                        for c in 0..<cols {
-                            let x = CGFloat(c) * cw + 8
-                            let y = CGFloat(r) * rh + rh * 0.5
-                            ctx.draw(
-                                Text(f)
-                                    .font(.system(size: 9.5, design: .monospaced))
-                                    .foregroundColor(Color(red: 0.80, green: 0.75, blue: 0.18).opacity(0.14)),
-                                at: CGPoint(x: x, y: y), anchor: .leading
-                            )
-                        }
+                    // Subtle soft blobs
+                    let blobData: [(CGFloat, CGFloat, CGFloat, CGFloat)] = [
+                        (0.15, 0.1,  250, 0.06),
+                        (0.8,  0.25, 300, 0.05),
+                        (0.3,  0.6,  280, 0.05),
+                        (0.7,  0.75, 260, 0.06),
+                    ]
+                    for (rx, ry, r, op) in blobData {
+                        let center = CGPoint(x: size.width * rx, y: size.height * ry)
+                        let rect   = CGRect(x: center.x - r, y: center.y - r,
+                                           width: r * 2, height: r * 2)
+                        ctx.fill(Path(ellipseIn: rect),
+                                 with: .color(tgAccent.opacity(op)))
                     }
                 }
             }

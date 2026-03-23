@@ -1,73 +1,57 @@
 import SwiftUI
 
-private let accent = Color(red: 0.35, green: 0.80, blue: 0.52)
-private let bg     = Color(red: 0.10, green: 0.13, blue: 0.10)
+// Telegram-inspired blue accent used across all screens
+let tgAccent = Color(red: 0.16, green: 0.65, blue: 0.93)
 
 // MARK: - Chats List
 
 struct ChatsListView: View {
-    @StateObject private var vm = ChatsViewModel()
-    @State private var search   = ""
-    @State private var filter   = "Все"
+    @StateObject private var vm     = ChatsViewModel()
+    @State private var search       = ""
+    @State private var filter       = "Все"
 
-    private let filters = ["Все", "Группы", "Каналы", "Личные"]
+    private let filters = ["Все", "Личные", "Группы"]
 
     private var shown: [VKConversationItem] {
-        let base = vm.items
-        let typed: [VKConversationItem]
+        let base: [VKConversationItem]
         switch filter {
-        case "Группы":  typed = base.filter { $0.conversation.peer.type == "group" }
-        case "Каналы":  typed = []
-        case "Личные":  typed = base.filter { $0.conversation.peer.type == "user" }
-        default:        typed = base
+        case "Личные":  base = vm.items.filter { $0.conversation.peer.type == "user" }
+        case "Группы":  base = vm.items.filter { $0.conversation.peer.type != "user" }
+        default:        base = vm.items
         }
-        guard !search.isEmpty else { return typed }
-        return typed.filter { vm.displayName(for: $0).localizedCaseInsensitiveContains(search) }
+        guard !search.isEmpty else { return base }
+        return base.filter { vm.displayName(for: $0).localizedCaseInsensitiveContains(search) }
     }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                bg.ignoresSafeArea()
+                Color(.systemBackground).ignoresSafeArea()
+
                 VStack(spacing: 0) {
-                    searchBar
                     filterBar
-                    Divider().background(Color(white: 0.18))
+                    Divider().opacity(0.4)
+
                     if vm.isLoading && vm.items.isEmpty {
                         Spacer()
-                        ProgressView().tint(accent)
+                        ProgressView().tint(tgAccent)
                         Spacer()
                     } else {
                         chatList
                     }
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Сообщения")
+            .navigationBarTitleDisplayMode(.large)
+            .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always),
+                        prompt: "Поиск")
             .toolbar { toolbarItems }
             .alert("Ошибка", isPresented: .constant(vm.error != nil)) {
                 Button("OK") { vm.error = nil }
             } message: { Text(vm.error ?? "") }
         }
+        .tint(tgAccent)
         .task { await vm.load() }
-    }
-
-    // MARK: - Search bar
-
-    var searchBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass").foregroundColor(Color(white: 0.45))
-            TextField("", text: $search,
-                      prompt: Text("Поиск").foregroundColor(Color(white: 0.35)))
-                .foregroundColor(.white)
-            if !search.isEmpty {
-                Button { search = "" } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundColor(Color(white: 0.4))
-                }
-            }
-        }
-        .padding(.horizontal, 12).padding(.vertical, 9)
-        .background(RoundedRectangle(cornerRadius: 13).fill(Color(white: 0.14)))
-        .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 4)
     }
 
     // MARK: - Filter chips
@@ -76,16 +60,23 @@ struct ChatsListView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(filters, id: \.self) { f in
-                    Button { withAnimation(.easeInOut(duration: 0.15)) { filter = f } } label: {
-                        Text(f == "Все" ? "⊞" : f)
-                            .font(.system(size: f == "Все" ? 16 : 14, weight: .medium))
-                            .padding(.horizontal, 14).padding(.vertical, 8)
-                            .background(Capsule().fill(filter == f ? accent : Color(white: 0.15)))
-                            .foregroundColor(filter == f ? Color(white: 0.06) : Color(white: 0.85))
-                    }.buttonStyle(.plain)
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) { filter = f }
+                    } label: {
+                        Text(f)
+                            .font(.system(size: 14, weight: .medium))
+                            .padding(.horizontal, 14).padding(.vertical, 7)
+                            .background(
+                                Capsule().fill(filter == f
+                                    ? tgAccent
+                                    : Color(.secondarySystemBackground))
+                            )
+                            .foregroundStyle(filter == f ? Color.white : Color(.label))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 16).padding(.vertical, 6)
+            .padding(.horizontal, 16).padding(.vertical, 8)
         }
     }
 
@@ -114,7 +105,7 @@ struct ChatsListView: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    Divider().background(Color(white: 0.18)).padding(.leading, 82)
+                    Divider().padding(.leading, 82)
                 }
             }
         }
@@ -125,12 +116,12 @@ struct ChatsListView: View {
 
     @ToolbarContentBuilder
     var toolbarItems: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarLeading) {
-            Button("Изм.") {}.foregroundColor(accent)
-        }
-        ToolbarItemGroup(placement: .navigationBarTrailing) {
-            Button { } label: { Image(systemName: "person.crop.circle.badge.plus").font(.system(size: 20)).foregroundColor(accent) }
-            Button { } label: { Image(systemName: "square.and.pencil").font(.system(size: 20)).foregroundColor(accent) }
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Button {
+            } label: {
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 18, weight: .medium))
+            }
         }
     }
 }
@@ -152,112 +143,71 @@ struct ChatRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            // Avatar with online dot
+            // Avatar with online indicator
             ZStack(alignment: .bottomTrailing) {
                 VKAvatarView(url: avatar, name: name, size: 54)
                 if isOnline {
                     Circle()
-                        .fill(accent)
-                        .frame(width: isMobile ? 12 : 14, height: isMobile ? 12 : 14)
+                        .fill(Color(.systemBackground))
+                        .frame(width: 16, height: 16)
                         .overlay(
-                            Circle().stroke(bg, lineWidth: 2)
+                            Circle().fill(tgAccent).padding(2.5)
                         )
                         .offset(x: 1, y: 1)
                 }
             }
 
-            VStack(alignment: .leading, spacing: 3) {
-                HStack {
+            // Content
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline) {
                     Text(name)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundStyle(Color(.label))
                         .lineLimit(1)
                     Spacer()
                     HStack(spacing: 3) {
-                        // Delivery status
+                        // Delivery check
                         switch delivery {
                         case .read:
-                            Image(systemName: "checkmark.circle")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(accent)
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(tgAccent)
                         case .sent:
                             Image(systemName: "checkmark")
                                 .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(Color(white: 0.5))
+                                .foregroundStyle(Color(.tertiaryLabel))
                         case .none:
                             EmptyView()
                         }
-                        Text(time).font(.system(size: 13)).foregroundColor(Color(white: 0.5))
+                        Text(time)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color(.secondaryLabel))
                     }
                 }
+
                 HStack(alignment: .bottom) {
                     Text(preview)
                         .font(.system(size: 14))
-                        .foregroundColor(isTyping ? accent : Color(white: 0.5))
+                        .foregroundStyle(isTyping ? tgAccent : Color(.secondaryLabel))
                         .lineLimit(2)
-                    Spacer()
+                    Spacer(minLength: 4)
                     if unread > 0 {
                         Text(unread > 999 ? "999+" : "\(unread)")
                             .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundStyle(.white)
                             .padding(.horizontal, 7).padding(.vertical, 3)
-                            .background(Capsule().fill(accent))
+                            .background(Capsule().fill(tgAccent))
                     } else if isPinned {
                         Image(systemName: "pin.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(Color(white: 0.4))
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color(.tertiaryLabel))
                             .rotationEffect(.degrees(45))
                     }
                 }
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
-        .background(bg)
-    }
-}
-
-// MARK: - Reusable Avatar
-
-struct VKAvatarView: View {
-    let url:  URL?
-    let name: String
-    let size: CGFloat
-
-    var body: some View {
-        Group {
-            if let url = url {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let img): img.resizable().scaledToFill()
-                    default: placeholder
-                    }
-                }
-            } else { placeholder }
-        }
-        .frame(width: size, height: size)
-        .clipShape(Circle())
-    }
-
-    var placeholder: some View {
-        Circle()
-            .fill(LinearGradient(
-                colors: [Color(hue: nameHue, saturation: 0.55, brightness: 0.55),
-                         Color(hue: nameHue, saturation: 0.70, brightness: 0.35)],
-                startPoint: .topLeading, endPoint: .bottomTrailing))
-            .overlay(
-                Text(initials)
-                    .font(.system(size: size * 0.38, weight: .semibold))
-                    .foregroundColor(.white)
-            )
-    }
-
-    private var initials: String {
-        let parts = name.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
-        if parts.count >= 2 { return String(parts[0].prefix(1)) + String(parts[1].prefix(1)) }
-        return String(name.prefix(2)).uppercased()
-    }
-    private var nameHue: Double {
-        let hash = name.unicodeScalars.reduce(0) { $0 &+ Int($1.value) }
-        return Double(abs(hash) % 360) / 360.0
+        .background(Color(.systemBackground))
+        .contentShape(Rectangle())
     }
 }

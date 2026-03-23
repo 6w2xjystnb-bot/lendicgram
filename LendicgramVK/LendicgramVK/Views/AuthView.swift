@@ -7,40 +7,62 @@ struct AuthView: View {
     @ObservedObject private var auth = VKAuthService.shared
     @State private var showWeb = false
 
-    private let accent = Color(red: 0.35, green: 0.80, blue: 0.52)
-    private let bg     = Color(red: 0.07, green: 0.10, blue: 0.07)
-
     var body: some View {
         ZStack {
-            bg.ignoresSafeArea()
-            VStack(spacing: 32) {
+            Color(.systemBackground).ignoresSafeArea()
+
+            VStack(spacing: 0) {
                 Spacer()
-                Image(systemName: "message.fill")
-                    .font(.system(size: 72))
-                    .foregroundColor(accent)
-                VStack(spacing: 8) {
-                    Text("Lendicgram").font(.system(size: 32, weight: .bold)).foregroundColor(.white)
-                    Text("Войдите через аккаунт ВКонтакте").font(.system(size: 16)).foregroundColor(Color(white: 0.5))
-                }
-                Spacer()
-                Button {
-                    showWeb = true
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: "person.fill.badge.plus")
-                        Text("Войти через VK")
-                            .font(.system(size: 17, weight: .semibold))
+
+                // Logo + title
+                VStack(spacing: 16) {
+                    ZStack {
+                        Circle()
+                            .fill(tgAccent.gradient)
+                            .frame(width: 96, height: 96)
+                        Image(systemName: "message.fill")
+                            .font(.system(size: 42, weight: .medium))
+                            .foregroundStyle(.white)
                     }
-                    .foregroundColor(Color(white: 0.05))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Capsule().fill(accent))
+                    VStack(spacing: 6) {
+                        Text("Lendicgram")
+                            .font(.system(size: 30, weight: .bold))
+                            .foregroundStyle(Color(.label))
+                        Text("Мессенджер для ВКонтакте")
+                            .font(.system(size: 16))
+                            .foregroundStyle(Color(.secondaryLabel))
+                    }
                 }
-                .padding(.horizontal, 32)
-                .padding(.bottom, 48)
+
+                Spacer()
+
+                // Login button
+                VStack(spacing: 12) {
+                    Button {
+                        showWeb = true
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "person.fill.badge.plus")
+                                .font(.system(size: 17, weight: .semibold))
+                            Text("Войти через VK")
+                                .font(.system(size: 17, weight: .semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(tgAccent, in: Capsule())
+                    }
+                    .padding(.horizontal, 32)
+
+                    Text("Нажимая «Войти», вы соглашаетесь с условиями использования")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color(.secondaryLabel))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                }
+                .padding(.bottom, 52)
             }
         }
-        .preferredColorScheme(.dark)
         .sheet(isPresented: $showWeb) {
             VKWebAuthSheet()
         }
@@ -63,7 +85,7 @@ struct VKWebAuthSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Отмена") { dismiss() }.foregroundColor(Color(red: 0.35, green: 0.80, blue: 0.52))
+                    Button("Отмена") { dismiss() }.tint(tgAccent)
                 }
             }
         }
@@ -78,11 +100,8 @@ struct VKWebView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(onToken: onToken) }
 
     func makeUIView(context: Context) -> WKWebView {
-        let config    = WKWebViewConfiguration()
-        let webView   = WKWebView(frame: .zero, configuration: config)
+        let webView = WKWebView(frame: .zero)
         webView.navigationDelegate = context.coordinator
-        webView.backgroundColor    = UIColor(red: 0.07, green: 0.10, blue: 0.07, alpha: 1)
-        webView.scrollView.backgroundColor = .clear
         webView.load(URLRequest(url: VKConfig.authURL))
         return webView
     }
@@ -93,10 +112,7 @@ struct VKWebView: UIViewRepresentable {
         let onToken: (String, Int) -> Void
         init(onToken: @escaping (String, Int) -> Void) { self.onToken = onToken }
 
-        func webView(_ webView: WKWebView,
-                     didFinish navigation: WKNavigation!) {
-            // VK puts access_token in the URL fragment (#access_token=...)
-            // WKWebView doesn't expose it directly, so we read it via JS
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             webView.evaluateJavaScript("window.location.href") { [weak self] result, _ in
                 guard let url = result as? String else { return }
                 self?.tryExtract(from: url, webView: webView)
@@ -104,19 +120,14 @@ struct VKWebView: UIViewRepresentable {
         }
 
         private func tryExtract(from urlString: String, webView: WKWebView) {
-            // Fragment approach first
             if let frag = URL(string: urlString)?.fragment, frag.contains("access_token") {
-                parse(fragment: frag)
-                return
+                parse(fragment: frag); return
             }
-            // Some VK flows put params in query string after redirect
             if urlString.contains("access_token=") {
                 let raw = urlString.components(separatedBy: "#").last
                     ?? urlString.components(separatedBy: "?").last ?? ""
-                parse(fragment: raw)
-                return
+                parse(fragment: raw); return
             }
-            // Hash is only accessible via JS on blank.html
             if urlString.contains("blank.html") {
                 webView.evaluateJavaScript("window.location.hash") { [weak self] res, _ in
                     if let hash = res as? String {

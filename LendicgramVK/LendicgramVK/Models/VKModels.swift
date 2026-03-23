@@ -417,7 +417,8 @@ struct VKSticker: Decodable {
     let imagesWithBackground: [VKStickerImage]?
     let animationUrl: String?
     var bestURL: URL? {
-        let imgs = imagesWithBackground ?? images ?? []
+        // Use transparent images; fall back to background variants only if needed
+        let imgs = images ?? imagesWithBackground ?? []
         return imgs.max(by: { $0.width < $1.width })
             .flatMap { URL(string: $0.url) }
     }

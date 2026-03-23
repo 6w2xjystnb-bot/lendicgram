@@ -24,7 +24,6 @@ struct ContentView: View {
                 ProfileView()
             }
         }
-        .preferredColorScheme(.dark)
-        .tint(Color(red: 0.35, green: 0.80, blue: 0.52))
+        .tint(tgAccent)
     }
 }
