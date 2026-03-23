@@ -138,19 +138,21 @@ struct ChatView: View {
     // MARK: - Input Bar
 
     var inputBar: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            // Attachment / photo picker (Bubble 1: Paperclip)
+        HStack(alignment: .bottom, spacing: 10) {
+
+            // ── Bubble 1: paperclip ──────────────────────────────────
             PhotosPicker(selection: $pickerItems,
                          maxSelectionCount: 10,
                          matching: .any(of: [.images, .videos])) {
                 Image(systemName: "paperclip")
-                    .font(.system(size: 24))
+                    .font(.system(size: 22))
                     .foregroundStyle(Color(.secondaryLabel))
                     .frame(width: 44, height: 44)
+                    .background(.ultraThinMaterial, in: Circle())
             }
 
-            // Text field capsule (Bubble 2: Message & Smile)
-            HStack(alignment: .bottom, spacing: 8) {
+            // ── Bubble 2: text field ─────────────────────────────────
+            HStack(alignment: .bottom, spacing: 6) {
                 TextField("Сообщение", text: $input, axis: .vertical)
                     .lineLimit(1...6)
                     .font(.system(size: 17))
@@ -160,40 +162,42 @@ struct ChatView: View {
 
                 Button {
                 } label: {
-                    Image(systemName: "face.smiling")
-                        .font(.system(size: 24))
+                    Image(systemName: input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "clock" : "face.smiling")
+                        .font(.system(size: 20))
                         .foregroundStyle(Color(.secondaryLabel))
                         .padding(.bottom, 10)
                 }
             }
-            .padding(.horizontal, 16).padding(.vertical, 8)
-            .background(Color(.tertiarySystemFill), in: Capsule())
+            .padding(.horizontal, 14)
+            .background(.ultraThinMaterial, in: Capsule())
+            .frame(maxWidth: .infinity)
 
-            // Send / mic (Bubble 3: Recording/Send)
+            // ── Bubble 3: mic / send ─────────────────────────────────
             Button(action: {
                 Task { await vm.send(text: input); input = "" }
             }) {
-                Group {
+                ZStack {
+                    Circle()
+                        .fill(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                              ? AnyShapeStyle(.ultraThinMaterial)
+                              : AnyShapeStyle(tgAccent))
+                        .frame(width: 44, height: 44)
+
                     if vm.isSending {
                         ProgressView().tint(.white)
-                            .frame(width: 44, height: 44)
                     } else {
                         Image(systemName: input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                               ? "mic" : "arrow.up")
-                            .font(.system(size: 24))
-                            .foregroundStyle(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color(.label) : .white)
-                            .frame(width: 44, height: 44)
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                             ? Color(.secondaryLabel) : .white)
                     }
                 }
-                .background(
-                    Circle().fill(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        ? Color.clear : tgAccent)
-                )
             }
             .disabled(vm.isSending || input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(.bar)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
     }
 
     // MARK: - Toolbar
