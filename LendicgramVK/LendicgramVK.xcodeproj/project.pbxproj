@@ -23,6 +23,8 @@
 		B014 /* ProfileView.swift in Sources */        = {isa = PBXBuildFile; fileRef = F014; };
 		B015 /* ContactsView.swift in Sources */       = {isa = PBXBuildFile; fileRef = F015; };
 		B016 /* Assets.xcassets in Resources */        = {isa = PBXBuildFile; fileRef = F016; };
+		B017 /* AudioPlayerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F017; };
+		B018 /* ContactsViewModel.swift in Sources */  = {isa = PBXBuildFile; fileRef = F018; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +44,8 @@
 		F014 /* ProfileView.swift */       = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ProfileView.swift";             sourceTree = "<group>"; };
 		F015 /* ContactsView.swift */      = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ContactsView.swift";            sourceTree = "<group>"; };
 		F016 /* Assets.xcassets */         = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets;                   sourceTree = "<group>"; };
+		F017 /* AudioPlayerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/AudioPlayerService.swift"; sourceTree = "<group>"; };
+		F018 /* ContactsViewModel.swift */  = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ViewModels/ContactsViewModel.swift";  sourceTree = "<group>"; };
 		P001 /* LendicgramVK.app */        = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LendicgramVK.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -65,8 +69,8 @@
 			children = (
 				F001, F002,
 				F003,
-				F004, F005, F006, F007,
-				F008, F009, F010,
+				F004, F005, F006, F007, F017,
+				F008, F009, F010, F018,
 				F011, F012, F013, F014, F015,
 				F016,
 			);
@@ -133,8 +137,8 @@
 			files = (
 				B001, B002,
 				B003,
-				B004, B005, B006, B007,
-				B008, B009, B010,
+				B004, B005, B006, B007, B017,
+				B008, B009, B010, B018,
 				B011, B012, B013, B014, B015,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

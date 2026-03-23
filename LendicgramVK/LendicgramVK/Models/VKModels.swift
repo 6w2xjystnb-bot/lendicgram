@@ -27,22 +27,63 @@ struct VKUser: Decodable, Identifiable {
     let id: Int
     let firstName: String
     let lastName: String
+    let photo50: String?
     let photo100: String?
+    let photo200: String?
     let online: Int?
+    let onlineMobile: Int?
+    let lastSeen: VKLastSeen?
+    let sex: Int?           // 1 = female, 2 = male
+
     var fullName: String  { "\(firstName) \(lastName)" }
-    var avatarURL: URL?   { URL(string: photo100 ?? "") }
+    var avatarURL: URL?   { URL(string: photo100 ?? photo50 ?? "") }
+    var isOnline: Bool    { (online ?? 0) == 1 }
+    var isMobile: Bool    { (onlineMobile ?? 0) == 1 }
+
     enum CodingKeys: String, CodingKey {
         case id; case firstName = "first_name"; case lastName = "last_name"
-        case photo100 = "photo_100"; case online
+        case photo50 = "photo_50"; case photo100 = "photo_100"; case photo200 = "photo_200"
+        case online; case onlineMobile = "online_mobile"
+        case lastSeen = "last_seen"; case sex
     }
+
+    var statusText: String {
+        if isOnline { return isMobile ? "в сети с телефона" : "в сети" }
+        guard let ls = lastSeen, let time = ls.time else { return "" }
+        let date = Date(timeIntervalSince1970: TimeInterval(time))
+        let now  = Date()
+        let diff = now.timeIntervalSince(date)
+        let cal  = Calendar.current
+        let pre  = (sex ?? 0) == 1 ? "была" : "был"
+
+        if diff < 60   { return "\(pre) только что" }
+        if diff < 3600 { return "\(pre) \(Int(diff / 60)) мин. назад" }
+
+        let f = DateFormatter(); f.locale = Locale(identifier: "ru_RU")
+        if cal.isDateInToday(date)     { f.dateFormat = "HH:mm"; return "\(pre) в \(f.string(from: date))" }
+        if cal.isDateInYesterday(date) { f.dateFormat = "HH:mm"; return "\(pre) вчера в \(f.string(from: date))" }
+        if diff < 7 * 86400           { f.dateFormat = "EEEE 'в' HH:mm"; return "\(pre) \(f.string(from: date))" }
+        f.dateFormat = "d MMM 'в' HH:mm"
+        return "\(pre) \(f.string(from: date))"
+    }
+}
+
+struct VKLastSeen: Decodable {
+    let time: Int?
+    let platform: Int?
 }
 
 struct VKGroup: Decodable, Identifiable {
     let id: Int
     let name: String
+    let photo50: String?
     let photo100: String?
-    var avatarURL: URL? { URL(string: photo100 ?? "") }
-    enum CodingKeys: String, CodingKey { case id; case name; case photo100 = "photo_100" }
+    let photo200: String?
+    var avatarURL: URL? { URL(string: photo100 ?? photo50 ?? "") }
+    enum CodingKeys: String, CodingKey {
+        case id; case name
+        case photo50 = "photo_50"; case photo100 = "photo_100"; case photo200 = "photo_200"
+    }
 }
 
 // MARK: - Conversations
@@ -54,6 +95,12 @@ struct VKConversationsResponse: Decodable {
     let groups: [VKGroup]?
 }
 
+struct VKConversationsByIdResponse: Decodable {
+    let count: Int
+    let items: [VKConversation]
+    let profiles: [VKUser]?
+}
+
 struct VKConversationItem: Decodable, Identifiable {
     var id: Int { conversation.peer.id }
     let conversation: VKConversation
@@ -63,12 +110,20 @@ struct VKConversationItem: Decodable, Identifiable {
 
 struct VKConversation: Decodable {
     let peer: VKPeer
+    let inRead: Int?
+    let outRead: Int?
+    let lastMessageId: Int?
     let unreadCount: Int?
     let isPinned: Bool?
+    let isMarkedUnread: Bool?
     let canSendMessage: Bool?
     let chatSettings: VKChatSettings?
     enum CodingKeys: String, CodingKey {
-        case peer; case unreadCount = "unread_count"; case isPinned = "is_pinned"
+        case peer
+        case inRead = "in_read"; case outRead = "out_read"
+        case lastMessageId = "last_message_id"
+        case unreadCount = "unread_count"; case isPinned = "is_pinned"
+        case isMarkedUnread = "is_marked_unread"
         case canSendMessage = "can_send_message"; case chatSettings = "chat_settings"
     }
 }
@@ -82,15 +137,22 @@ struct VKChatSettings: Decodable {
     let title: String
     let membersCount: Int?
     let photo: VKChatPhoto?
+    let activeIds: [Int]?
+    let state: String?
     enum CodingKeys: String, CodingKey {
         case title; case membersCount = "members_count"; case photo
+        case activeIds = "active_ids"; case state
     }
 }
 
 struct VKChatPhoto: Decodable {
+    let photo50: String?
     let photo100: String?
-    var url: URL? { URL(string: photo100 ?? "") }
-    enum CodingKeys: String, CodingKey { case photo100 = "photo_100" }
+    let photo200: String?
+    var url: URL? { URL(string: photo100 ?? photo50 ?? "") }
+    enum CodingKeys: String, CodingKey {
+        case photo50 = "photo_50"; case photo100 = "photo_100"; case photo200 = "photo_200"
+    }
 }
 
 // MARK: - Messages
@@ -109,14 +171,47 @@ struct VKAPIMessage: Decodable, Identifiable {
     let text: String
     let date: Int
     let out: Int
-    let readState: Int?
     let attachments: [VKAttachment]?
+    let replyMessage: VKReplyMessage?
+    let fwdMessages: [VKReplyMessage]?
+    let action: VKMessageAction?
+    let updateTime: Int?
+    let important: Bool?
+
     var isOutgoing: Bool { out == 1 }
-    var isRead: Bool     { readState == 1 }
+    var isEdited: Bool   { (updateTime ?? 0) > 0 }
+    var isService: Bool  { action != nil }
     var dateValue: Date  { Date(timeIntervalSince1970: TimeInterval(date)) }
+
     enum CodingKeys: String, CodingKey {
         case id; case fromId = "from_id"; case peerId = "peer_id"
-        case text; case date; case out; case readState = "read_state"; case attachments
+        case text; case date; case out
+        case attachments; case replyMessage = "reply_message"
+        case fwdMessages = "fwd_messages"; case action
+        case updateTime = "update_time"; case important
+    }
+}
+
+struct VKReplyMessage: Decodable, Identifiable {
+    let id: Int
+    let fromId: Int
+    let peerId: Int?
+    let text: String
+    let date: Int
+    let attachments: [VKAttachment]?
+    enum CodingKeys: String, CodingKey {
+        case id; case fromId = "from_id"; case peerId = "peer_id"
+        case text; case date; case attachments
+    }
+}
+
+struct VKMessageAction: Decodable {
+    let type: String        // chat_create, chat_invite_user, chat_kick_user, chat_title_update, chat_photo_update, chat_pin_message, chat_unpin_message
+    let memberId: Int?
+    let text: String?
+    let email: String?
+    enum CodingKeys: String, CodingKey {
+        case type; case memberId = "member_id"; case text; case email
     }
 }
 
@@ -125,58 +220,242 @@ struct VKAPIMessage: Decodable, Identifiable {
 struct VKAttachment: Decodable {
     let type: String
     let photo: VKPhoto?
-    let sticker: VKSticker?
-    let doc: VKDoc?
     let video: VKVideo?
+    let audio: VKAudio?
+    let doc: VKDoc?
+    let link: VKLink?
+    let sticker: VKSticker?
+    let gift: VKGift?
+    let wall: VKWall?
+    let graffiti: VKGraffiti?
+    let poll: VKPoll?
     let audioMessage: VKAudioMessage?
     let videoMessage: VKVideoMessage?
     enum CodingKeys: String, CodingKey {
-        case type; case photo; case sticker; case doc; case video
+        case type; case photo; case video; case audio; case doc; case link
+        case sticker; case gift; case wall; case graffiti; case poll
         case audioMessage = "audio_message"
         case videoMessage = "video_message"
     }
 }
 
 struct VKPhoto: Decodable {
+    let id: Int?
+    let ownerId: Int?
     let sizes: [VKPhotoSize]?
+    let text: String?
     var bestURL: URL? {
         for t in ["x","y","z","w","r","q","p","o","m","s"] {
             if let s = sizes?.first(where: { $0.type == t }), let url = URL(string: s.url) { return url }
         }
-        return nil
+        return sizes?.last.flatMap { URL(string: $0.url) }
+    }
+    var thumbURL: URL? {
+        for t in ["m","s","o","p","q","r","x"] {
+            if let s = sizes?.first(where: { $0.type == t }), let url = URL(string: s.url) { return url }
+        }
+        return bestURL
+    }
+    var aspectRatio: CGFloat {
+        guard let best = sizes?.first(where: { ["x","y","z","w"].contains($0.type) }),
+              let w = best.width, let h = best.height, h > 0 else { return 1.0 }
+        return CGFloat(w) / CGFloat(h)
+    }
+    enum CodingKeys: String, CodingKey {
+        case id; case ownerId = "owner_id"; case sizes; case text
     }
 }
-struct VKPhotoSize: Decodable { let type: String; let url: String }
+
+struct VKPhotoSize: Decodable {
+    let type: String
+    let url: String
+    let width: Int?
+    let height: Int?
+}
+
+struct VKVideo: Decodable {
+    let id: Int
+    let ownerId: Int?
+    let title: String?
+    let duration: Int?
+    let image: [VKVideoImage]?
+    let firstFrame: [VKVideoImage]?
+    var thumbURL: URL? {
+        let imgs = image ?? firstFrame ?? []
+        return imgs.max(by: { ($0.width ?? 0) < ($1.width ?? 0) })
+            .flatMap { URL(string: $0.url) }
+    }
+    var durationFormatted: String {
+        guard let d = duration else { return "" }
+        let m = d / 60; let s = d % 60
+        return String(format: "%d:%02d", m, s)
+    }
+    enum CodingKeys: String, CodingKey {
+        case id; case ownerId = "owner_id"; case title; case duration
+        case image; case firstFrame = "first_frame"
+    }
+}
+
+struct VKVideoImage: Decodable {
+    let url: String; let width: Int?; let height: Int?
+}
+
+struct VKAudio: Decodable {
+    let id: Int
+    let ownerId: Int?
+    let artist: String?
+    let title: String?
+    let duration: Int?
+    var durationFormatted: String {
+        guard let d = duration else { return "" }
+        return String(format: "%d:%02d", d / 60, d % 60)
+    }
+    enum CodingKeys: String, CodingKey {
+        case id; case ownerId = "owner_id"; case artist; case title; case duration
+    }
+}
+
+struct VKDoc: Decodable {
+    let id: Int
+    let ownerId: Int?
+    let title: String
+    let size: Int?
+    let ext: String?
+    let url: String?
+    let preview: VKDocPreview?
+    var sizeFormatted: String {
+        guard let s = size else { return "" }
+        if s < 1024            { return "\(s) Б" }
+        if s < 1024 * 1024     { return "\(s / 1024) КБ" }
+        return String(format: "%.1f МБ", Double(s) / 1_048_576.0)
+    }
+    enum CodingKeys: String, CodingKey {
+        case id; case ownerId = "owner_id"; case title; case size
+        case ext; case url; case preview
+    }
+}
+
+struct VKDocPreview: Decodable {
+    let photo: VKDocPreviewPhoto?
+    let graffiti: VKDocPreviewGraffiti?
+}
+struct VKDocPreviewPhoto: Decodable { let sizes: [VKPhotoSize]? }
+struct VKDocPreviewGraffiti: Decodable {
+    let src: String?
+    var url: URL? { URL(string: src ?? "") }
+}
+
+struct VKLink: Decodable {
+    let url: String
+    let title: String?
+    let caption: String?
+    let description: String?
+    let photo: VKPhoto?
+}
 
 struct VKSticker: Decodable {
     let stickerId: Int?
+    let productId: Int?
+    let images: [VKStickerImage]?
     let imagesWithBackground: [VKStickerImage]?
+    let animationUrl: String?
     var bestURL: URL? {
-        (imagesWithBackground ?? []).max(by: { $0.width < $1.width })
+        let imgs = imagesWithBackground ?? images ?? []
+        return imgs.max(by: { $0.width < $1.width })
             .flatMap { URL(string: $0.url) }
     }
     enum CodingKeys: String, CodingKey {
-        case stickerId = "sticker_id"; case imagesWithBackground = "images_with_background"
+        case stickerId = "sticker_id"; case productId = "product_id"
+        case images; case imagesWithBackground = "images_with_background"
+        case animationUrl = "animation_url"
     }
 }
 struct VKStickerImage: Decodable { let url: String; let width: Int; let height: Int }
 
-struct VKDoc: Decodable { let id: Int; let title: String; let ext: String? }
-struct VKVideo: Decodable { let id: Int; let title: String }
+struct VKGift: Decodable {
+    let id: Int
+    let thumb256: String?
+    let thumb96: String?
+    var thumbURL: URL? { URL(string: thumb256 ?? thumb96 ?? "") }
+    enum CodingKeys: String, CodingKey {
+        case id; case thumb256 = "thumb_256"; case thumb96 = "thumb_96"
+    }
+}
+
+struct VKWall: Decodable {
+    let id: Int?
+    let fromId: Int?
+    let text: String?
+    let attachments: [VKAttachment]?
+    enum CodingKeys: String, CodingKey {
+        case id; case fromId = "from_id"; case text; case attachments
+    }
+}
+
+struct VKGraffiti: Decodable {
+    let id: Int?
+    let url: String?
+    let width: Int?
+    let height: Int?
+    var imageURL: URL? { URL(string: url ?? "") }
+}
+
+struct VKPoll: Decodable {
+    let id: Int
+    let ownerId: Int?
+    let question: String?
+    let votes: Int?
+    let answers: [VKPollAnswer]?
+    let anonymous: Bool?
+    let multiple: Bool?
+    enum CodingKeys: String, CodingKey {
+        case id; case ownerId = "owner_id"; case question; case votes
+        case answers; case anonymous; case multiple
+    }
+}
+struct VKPollAnswer: Decodable, Identifiable {
+    let id: Int; let text: String; let votes: Int?; let rate: Double?
+}
+
 struct VKAudioMessage: Decodable {
+    let id: Int?
+    let ownerId: Int?
     let duration: Int?
+    let waveform: [Int]?
+    let linkOgg: String?
     let linkMp3: String?
-    enum CodingKeys: String, CodingKey { case duration; case linkMp3 = "link_mp3" }
+    let transcript: String?
+    enum CodingKeys: String, CodingKey {
+        case id; case ownerId = "owner_id"; case duration; case waveform
+        case linkOgg = "link_ogg"; case linkMp3 = "link_mp3"; case transcript
+    }
 }
 
 struct VKVideoMessage: Decodable {
+    let id: Int?
+    let ownerId: Int?
     let duration: Int?
-    let previewUrl: String?
-    let linkMp4: String?
-    var previewURL: URL? { URL(string: previewUrl ?? "") }
-    enum CodingKeys: String, CodingKey {
-        case duration; case previewUrl = "preview_url"; case linkMp4 = "link_mp4"
+    let preview: [VKVideoMessagePreview]?
+    let link: String?
+    let accessKey: String?
+    var previewURL: URL? {
+        preview?.max(by: { ($0.width ?? 0) < ($1.width ?? 0) })
+            .flatMap { URL(string: $0.src) }
     }
+    enum CodingKeys: String, CodingKey {
+        case id; case ownerId = "owner_id"; case duration
+        case preview; case link; case accessKey = "access_key"
+    }
+}
+struct VKVideoMessagePreview: Decodable {
+    let src: String; let width: Int?; let height: Int?
+}
+
+// MARK: - Friends
+
+struct VKFriendsResponse: Decodable {
+    let count: Int
+    let items: [VKUser]
 }
 
 // MARK: - Long Poll
@@ -190,13 +469,11 @@ struct VKLongPollResponse: Decodable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        if let s = try? c.decode(String.self, forKey: .ts) {
-            ts = s
-        } else {
-            ts = String(try c.decode(Int.self, forKey: .ts))
-        }
-        updates = try? c.decodeIfPresent([[LPValue]].self, forKey: .updates) ?? nil
-        failed  = try? c.decodeIfPresent(Int.self, forKey: .failed) ?? nil
+        if let s = try? c.decode(String.self, forKey: .ts) { ts = s }
+        else if let i = try? c.decode(Int.self, forKey: .ts) { ts = String(i) }
+        else { ts = "0" }
+        updates = try? c.decodeIfPresent([[LPValue]].self, forKey: .updates)
+        failed  = try? c.decodeIfPresent(Int.self, forKey: .failed)
     }
     enum CodingKeys: String, CodingKey { case ts, updates, failed }
 }
@@ -220,7 +497,7 @@ extension Int {
         let date = Date(timeIntervalSince1970: TimeInterval(self))
         let now  = Date()
         let diff = now.timeIntervalSince(date)
-        if diff < 60   { return "сейчас" }
+        if diff < 60 { return "сейчас" }
         let cal = Calendar.current
         if cal.isDateInToday(date) {
             let f = DateFormatter(); f.dateFormat = "HH:mm"; return f.string(from: date)
@@ -229,6 +506,17 @@ extension Int {
         let f = DateFormatter()
         f.locale = Locale(identifier: "ru_RU")
         f.dateFormat = date > now.addingTimeInterval(-7*86400) ? "EEE" : "d MMM"
+        return f.string(from: date)
+    }
+
+    var vkDateSeparator: String {
+        let date = Date(timeIntervalSince1970: TimeInterval(self))
+        let cal  = Calendar.current
+        if cal.isDateInToday(date)     { return "Сегодня" }
+        if cal.isDateInYesterday(date) { return "Вчера" }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ru_RU")
+        f.dateFormat = "d MMMM yyyy"
         return f.string(from: date)
     }
 }

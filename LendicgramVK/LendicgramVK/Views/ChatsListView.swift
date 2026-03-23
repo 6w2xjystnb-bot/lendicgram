@@ -6,9 +6,9 @@ private let bg     = Color(red: 0.10, green: 0.13, blue: 0.10)
 // MARK: - Chats List
 
 struct ChatsListView: View {
-    @StateObject private var vm     = ChatsViewModel()
-    @State private var search       = ""
-    @State private var filter       = "Все"
+    @StateObject private var vm = ChatsViewModel()
+    @State private var search   = ""
+    @State private var filter   = "Все"
 
     private let filters = ["Все", "Группы", "Каналы", "Личные"]
 
@@ -17,7 +17,7 @@ struct ChatsListView: View {
         let typed: [VKConversationItem]
         switch filter {
         case "Группы":  typed = base.filter { $0.conversation.peer.type == "group" }
-        case "Каналы":  typed = []  // channels not in messages API by default
+        case "Каналы":  typed = []
         case "Личные":  typed = base.filter { $0.conversation.peer.type == "user" }
         default:        typed = base
         }
@@ -51,7 +51,7 @@ struct ChatsListView: View {
         .task { await vm.load() }
     }
 
-    // MARK: Search bar
+    // MARK: - Search bar
 
     var searchBar: some View {
         HStack(spacing: 8) {
@@ -70,7 +70,7 @@ struct ChatsListView: View {
         .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 4)
     }
 
-    // MARK: Filter chips
+    // MARK: - Filter chips
 
     var filterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -89,7 +89,7 @@ struct ChatsListView: View {
         }
     }
 
-    // MARK: Chat list
+    // MARK: - Chat list
 
     var chatList: some View {
         ScrollView {
@@ -103,10 +103,14 @@ struct ChatsListView: View {
                             item:     item,
                             name:     vm.displayName(for: item),
                             avatar:   vm.avatarURL(for: item),
-                            preview:  vm.lastMessagePreview(item.lastMessage),
+                            preview:  vm.isTyping(for: item) ?? vm.lastMessagePreview(item.lastMessage),
+                            isTyping: vm.isTyping(for: item) != nil,
                             unread:   item.conversation.unreadCount ?? 0,
                             isPinned: item.conversation.isPinned ?? false,
-                            time:     item.lastMessage?.date.vkTime ?? ""
+                            time:     item.lastMessage?.date.vkTime ?? "",
+                            isOnline: vm.isOnline(for: item),
+                            isMobile: vm.isMobileOnline(for: item),
+                            delivery: vm.deliveryStatus(for: item)
                         )
                     }
                     .buttonStyle(.plain)
@@ -117,7 +121,7 @@ struct ChatsListView: View {
         .refreshable { await vm.refresh() }
     }
 
-    // MARK: Toolbar
+    // MARK: - Toolbar
 
     @ToolbarContentBuilder
     var toolbarItems: some ToolbarContent {
@@ -138,15 +142,29 @@ struct ChatRow: View {
     let name:     String
     let avatar:   URL?
     let preview:  String
+    let isTyping: Bool
     let unread:   Int
     let isPinned: Bool
     let time:     String
-
-    private let isOut = false  // determined by lastMessage.isOutgoing below
+    let isOnline: Bool
+    let isMobile: Bool
+    let delivery: ChatsViewModel.DeliveryStatus
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            VKAvatarView(url: avatar, name: name, size: 54)
+            // Avatar with online dot
+            ZStack(alignment: .bottomTrailing) {
+                VKAvatarView(url: avatar, name: name, size: 54)
+                if isOnline {
+                    Circle()
+                        .fill(accent)
+                        .frame(width: isMobile ? 12 : 14, height: isMobile ? 12 : 14)
+                        .overlay(
+                            Circle().stroke(bg, lineWidth: 2)
+                        )
+                        .offset(x: 1, y: 1)
+                }
+            }
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack {
@@ -156,10 +174,18 @@ struct ChatRow: View {
                         .lineLimit(1)
                     Spacer()
                     HStack(spacing: 3) {
-                        if item.lastMessage?.isOutgoing == true {
+                        // Delivery status
+                        switch delivery {
+                        case .read:
+                            Image(systemName: "checkmark.circle")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(accent)
+                        case .sent:
                             Image(systemName: "checkmark")
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundColor(Color(white: 0.5))
+                        case .none:
+                            EmptyView()
                         }
                         Text(time).font(.system(size: 13)).foregroundColor(Color(white: 0.5))
                     }
@@ -167,7 +193,7 @@ struct ChatRow: View {
                 HStack(alignment: .bottom) {
                     Text(preview)
                         .font(.system(size: 14))
-                        .foregroundColor(Color(white: 0.5))
+                        .foregroundColor(isTyping ? accent : Color(white: 0.5))
                         .lineLimit(2)
                     Spacer()
                     if unread > 0 {
@@ -175,7 +201,7 @@ struct ChatRow: View {
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 7).padding(.vertical, 3)
-                            .background(Capsule().fill(Color(red:0.35,green:0.80,blue:0.52)))
+                            .background(Capsule().fill(accent))
                     } else if isPinned {
                         Image(systemName: "pin.fill")
                             .font(.system(size: 11))
