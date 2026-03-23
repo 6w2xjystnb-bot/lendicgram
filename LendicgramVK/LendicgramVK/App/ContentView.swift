@@ -121,18 +121,11 @@ struct LiquidGlassTabBar<T: RawRepresentable & CaseIterable & Hashable>: View
     @ViewBuilder
     func tabItem(for tab: T) -> some View {
         let isSelected = selected == tab
-        let badge = badges[tab, default: 0]
-
-        let title: String
-        let icon: String
-        let iconFilled: String
-        if let t = tab as? ContentView.Tab {
-            title      = t.title
-            icon       = t.icon
-            iconFilled = t.iconFilled
-        } else {
-            title = ""; icon = "circle"; iconFilled = "circle.fill"
-        }
+        let badge      = badges[tab, default: 0]
+        let cTab       = tab as? ContentView.Tab
+        let title      = cTab?.title      ?? ""
+        let icon       = cTab?.icon       ?? "circle"
+        let iconFilled = cTab?.iconFilled ?? "circle.fill"
 
         Button {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
