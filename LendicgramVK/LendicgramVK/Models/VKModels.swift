@@ -584,7 +584,27 @@ struct VKStickerProduct: Decodable, Identifiable {
     let title: String?
     let stickers: [VKProductSticker]?
     let previews: [VKStickerImage]?
+
     enum CodingKeys: String, CodingKey { case id; case title; case stickers; case previews }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id    = try c.decode(Int.self, forKey: .id)
+        title = try c.decodeIfPresent(String.self, forKey: .title)
+        previews = try c.decodeIfPresent([VKStickerImage].self, forKey: .previews)
+        // VK returns stickers as {"count":N,"items":[...]} — unwrap the wrapper
+        if let wrapper = try? c.decode(VKProductStickersWrapper.self, forKey: .stickers) {
+            stickers = wrapper.items
+        } else {
+            // Also try plain array just in case
+            stickers = try? c.decode([VKProductSticker].self, forKey: .stickers)
+        }
+    }
+}
+
+/// VK wraps stickers inside {"count":N,"items":[...]}
+private struct VKProductStickersWrapper: Decodable {
+    let items: [VKProductSticker]
 }
 
 struct VKProductSticker: Decodable, Identifiable {
@@ -592,13 +612,20 @@ struct VKProductSticker: Decodable, Identifiable {
     let images: [VKStickerImage]?
     let imagesWithBackground: [VKStickerImage]?
     var id: Int { stickerId }
+    /// Prefer transparent images; fall back to with-background; last resort — VK URL pattern
     var bestURL: URL? {
-        let imgs = images ?? imagesWithBackground ?? []
-        if let best = imgs.max(by: { $0.width < $1.width }),
+        // Prefer transparent (no background)
+        if let imgs = images, !imgs.isEmpty,
+           let best = imgs.max(by: { $0.width < $1.width }),
            let url = URL(string: best.url) {
             return url
         }
-        // Fallback: VK serves sticker PNGs at this well-known URL pattern
+        if let imgs = imagesWithBackground, !imgs.isEmpty,
+           let best = imgs.max(by: { $0.width < $1.width }),
+           let url = URL(string: best.url) {
+            return url
+        }
+        // Fallback URL pattern
         return URL(string: "https://vk.com/sticker/1-\(stickerId)-128")
     }
     enum CodingKeys: String, CodingKey {
