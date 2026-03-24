@@ -2,10 +2,15 @@ import SwiftUI
 import AVFoundation
 import PhotosUI
 
-// MARK: - Colors (shared)
+// MARK: - WhatsApp Dark Theme Colors
 
-private let outBubble = Color(red: 0.24, green: 0.52, blue: 0.88)
-private let inBubble  = Color(.secondarySystemBackground)
+private let waOutgoing   = Color(red: 0.00, green: 0.36, blue: 0.29)   // #005c4b
+private let waIncoming   = Color(red: 0.13, green: 0.17, blue: 0.20)   // #202c33
+private let waGreen      = Color(red: 0.00, green: 0.66, blue: 0.52)   // #00a884
+private let waCheckRead  = Color(red: 0.33, green: 0.74, blue: 0.92)   // #53bdeb
+private let waGray       = Color(red: 0.53, green: 0.59, blue: 0.63)   // #8696a0
+private let waInputField = Color(red: 0.16, green: 0.22, blue: 0.26)   // #2a3942
+private let waHeaderBg   = Color(red: 0.12, green: 0.17, blue: 0.21)   // #1f2c34
 
 // MARK: - Chat View
 
@@ -47,7 +52,9 @@ struct ChatView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { chatToolbar }
-        .tint(tgAccent)
+        .toolbarBackground(waHeaderBg, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .tint(.white)
         .alert("Ошибка", isPresented: .constant(vm.error != nil)) {
             Button("OK") { vm.error = nil }
         } message: { Text(vm.error ?? "") }
@@ -70,20 +77,20 @@ struct ChatView: View {
     var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 3) {
+                LazyVStack(spacing: 2) {
                     if vm.hasMore {
                         Button { Task { await vm.loadMore() } } label: {
                             if vm.isLoading {
-                                ProgressView().tint(tgAccent).padding()
+                                ProgressView().tint(waGreen).padding()
                             } else {
                                 Text("Загрузить ранее")
                                     .font(.system(size: 13))
-                                    .foregroundStyle(tgAccent)
+                                    .foregroundStyle(waGreen)
                                     .padding(10)
                             }
                         }
                     } else if vm.isLoading {
-                        ProgressView().tint(tgAccent).padding()
+                        ProgressView().tint(waGreen).padding()
                     }
 
                     ForEach(Array(vm.messages.enumerated()), id: \.element.id) { index, msg in
@@ -98,13 +105,14 @@ struct ChatView: View {
                                 profiles:    vm.profiles,
                                 isRead:      vm.isRead(msg),
                                 showSender:  vm.isGroupChat && !msg.isOutgoing,
+                                showTail:    shouldShowTail(at: index),
                                 audioPlayer: audioPlayer
                             )
                             .id(msg.id)
                         }
                     }
                 }
-                .padding(.horizontal, 10).padding(.vertical, 8)
+                .padding(.horizontal, 4).padding(.vertical, 8)
             }
             .onChange(of: vm.messages.count) { _, _ in
                 if let last = vm.messages.last {
@@ -123,14 +131,23 @@ struct ChatView: View {
         }
     }
 
+    // Whether this message should show a bubble tail
+    func shouldShowTail(at index: Int) -> Bool {
+        let msgs = vm.messages
+        guard index < msgs.count else { return true }
+        if index == 0 { return true }
+        let prev = msgs[index - 1]
+        return prev.isOutgoing != msgs[index].isOutgoing || prev.isService
+    }
+
     // MARK: - Date Separator
 
     func dateSeparator(_ ts: Int) -> some View {
         Text(ts.vkDateSeparator)
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(Color(.secondaryLabel))
-            .padding(.horizontal, 14).padding(.vertical, 5)
-            .background(.thinMaterial, in: Capsule())
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.9))
+            .padding(.horizontal, 12).padding(.vertical, 5)
+            .background(Color.black.opacity(0.35), in: Capsule())
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
     }
@@ -144,7 +161,7 @@ struct ChatView: View {
             let text  = names.isEmpty ? "печатает..." : "\(names.joined(separator: ", ")) печатает..."
             Text(text)
                 .font(.system(size: 13))
-                .foregroundStyle(Color(.secondaryLabel))
+                .foregroundStyle(waGray)
             Spacer()
         }
         .padding(.horizontal, 24).padding(.vertical, 4)
@@ -171,27 +188,26 @@ struct ChatView: View {
     }
 
     var normalInputBar: some View {
-        HStack(alignment: .bottom, spacing: 10) {
-
-            // ── Bubble 1: paperclip ──────────────────────────────────
+        HStack(alignment: .bottom, spacing: 8) {
+            // Paperclip
             PhotosPicker(selection: $pickerItems,
                          maxSelectionCount: 10,
                          matching: .any(of: [.images, .videos])) {
                 Image(systemName: "paperclip")
                     .font(.system(size: 22))
-                    .foregroundStyle(Color(.secondaryLabel))
-                    .frame(width: 44, height: 44)
-                    .glassEffect(.regular.interactive(), in: .circle)
+                    .foregroundStyle(waGray)
+                    .frame(width: 40, height: 40)
             }
 
-            // ── Bubble 2: text field ─────────────────────────────────
-            HStack(alignment: .bottom, spacing: 6) {
+            // Text field + emoji button
+            HStack(alignment: .bottom, spacing: 4) {
                 TextField("Сообщение", text: $input, axis: .vertical)
                     .lineLimit(1...6)
                     .font(.system(size: 17))
-                    .foregroundStyle(Color(.label))
+                    .foregroundStyle(.white)
                     .submitLabel(.return)
                     .padding(.vertical, 10)
+                    .padding(.leading, 12)
 
                 Button {
                     withAnimation(.easeInOut(duration: 0.25)) { showStickers.toggle() }
@@ -200,18 +216,16 @@ struct ChatView: View {
                     }
                 } label: {
                     Image(systemName: showStickers ? "keyboard" : "face.smiling")
-                        .font(.system(size: 20))
-                        .foregroundStyle(showStickers ? tgAccent : Color(.secondaryLabel))
-                        .padding(.bottom, 10)
+                        .font(.system(size: 22))
+                        .foregroundStyle(showStickers ? waGreen : waGray)
+                        .padding(.bottom, 9)
+                        .padding(.trailing, 10)
                 }
             }
-            .padding(.horizontal, 14)
-            .glassEffect(.regular.interactive(), in: .capsule)
-            .frame(maxWidth: .infinity)
+            .background(waInputField, in: RoundedRectangle(cornerRadius: 21))
 
-            // ── Bubble 3: mic / video / send ─────────────────────────
+            // Send / Mic
             if hasText {
-                // Send text
                 Button {
                     Task { await vm.send(text: input); input = "" }
                 } label: {
@@ -219,41 +233,29 @@ struct ChatView: View {
                         if vm.isSending {
                             ProgressView().tint(.white)
                         } else {
-                            Image(systemName: "arrow.up")
-                                .font(.system(size: 20, weight: .medium))
+                            Image(systemName: "mic.fill")
+                                .font(.system(size: 18, weight: .semibold))
                                 .foregroundStyle(.white)
                         }
                     }
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(tgAccent))
+                    .frame(width: 42, height: 42)
+                    .background(Circle().fill(waGreen))
                 }
                 .disabled(vm.isSending)
             } else {
-                // Voice record button (tap to start)
                 Button {
                     recorder.start()
                 } label: {
                     Image(systemName: "mic")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(Color(.secondaryLabel))
-                        .frame(width: 44, height: 44)
-                        .glassEffect(.regular.interactive(), in: .circle)
-                }
-
-                // Video message button
-                Button {
-                    showVideoRecorder = true
-                } label: {
-                    Image(systemName: "video.circle")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(Color(.secondaryLabel))
-                        .frame(width: 44, height: 44)
-                        .glassEffect(.regular.interactive(), in: .circle)
+                        .font(.system(size: 22))
+                        .foregroundStyle(waGray)
+                        .frame(width: 42, height: 42)
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 6)
+        .background(waHeaderBg)
     }
 
     // MARK: - Recording Bar
@@ -279,33 +281,32 @@ struct ChatView: View {
 
                 Text(formatRecordingDuration(recorder.duration))
                     .font(.system(size: 17, weight: .medium).monospacedDigit())
-                    .foregroundStyle(Color(.label))
+                    .foregroundStyle(.white)
 
-                // Live mini waveform
                 RecordingWaveformView(samples: recorder.waveformSamples)
                     .frame(height: 24)
                     .frame(maxWidth: .infinity)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .glassEffect(.regular.interactive(), in: .capsule)
+            .background(waInputField, in: Capsule())
             .frame(maxWidth: .infinity)
 
-            // Send
             Button {
                 if let result = recorder.stop() {
                     Task { await vm.sendVoice(fileURL: result.url) }
                 }
             } label: {
                 Image(systemName: "arrow.up")
-                    .font(.system(size: 20, weight: .medium))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(tgAccent))
+                    .frame(width: 42, height: 42)
+                    .background(Circle().fill(waGreen))
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 6)
+        .background(waHeaderBg)
     }
 
     private func formatRecordingDuration(_ d: TimeInterval) -> String {
@@ -321,22 +322,22 @@ struct ChatView: View {
         ToolbarItem(placement: .principal) {
             VStack(spacing: 1) {
                 Text(peerName)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color(.label))
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
                     .lineLimit(1)
                 Group {
                     if !vm.typingUserIds.isEmpty {
                         Text("печатает...")
-                            .foregroundStyle(tgAccent)
+                            .foregroundStyle(waGreen)
                     } else if let u = vm.peerUser {
                         Text(u.isOnline ? (u.isMobile ? "в сети с телефона" : "в сети") : u.statusText)
-                            .foregroundStyle(u.isOnline ? tgAccent : Color(.secondaryLabel))
+                            .foregroundStyle(u.isOnline ? waGreen : waGray)
                     } else if vm.isGroupChat {
                         Text("беседа")
-                            .foregroundStyle(Color(.secondaryLabel))
+                            .foregroundStyle(waGray)
                     }
                 }
-                .font(.system(size: 12))
+                .font(.system(size: 13))
             }
         }
         ToolbarItem(placement: .navigationBarTrailing) {
@@ -364,11 +365,11 @@ struct ServiceBubble: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 13))
-            .foregroundStyle(Color(.secondaryLabel))
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(.white.opacity(0.8))
             .multilineTextAlignment(.center)
-            .padding(.horizontal, 14).padding(.vertical, 5)
-            .background(.thinMaterial, in: Capsule())
+            .padding(.horizontal, 12).padding(.vertical, 5)
+            .background(Color.black.opacity(0.35), in: Capsule())
             .frame(maxWidth: .infinity)
             .padding(.vertical, 4)
     }
@@ -401,30 +402,25 @@ struct BubbleView: View {
     let profiles:    [Int: VKUser]
     let isRead:      Bool
     let showSender:  Bool
+    var showTail:    Bool = true
     let audioPlayer: AudioPlayerService
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 6) {
-            if msg.isOutgoing { Spacer(minLength: 52) }
-            if !msg.isOutgoing {
-                VKAvatarView(
-                    url:  profiles[msg.fromId]?.avatarURL,
-                    name: profiles[msg.fromId]?.fullName ?? "?",
-                    size: 30
-                )
-            }
+        HStack(alignment: .bottom, spacing: 0) {
+            if msg.isOutgoing { Spacer(minLength: 60) }
 
             VStack(alignment: msg.isOutgoing ? .trailing : .leading, spacing: 2) {
                 if showSender {
                     Text(profiles[msg.fromId]?.firstName ?? "")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(senderColor(msg.fromId))
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, 14)
                 }
                 bubble
             }
+            .padding(msg.isOutgoing ? .trailing : .leading, showTail ? 0 : 8)
 
-            if !msg.isOutgoing { Spacer(minLength: 52) }
+            if !msg.isOutgoing { Spacer(minLength: 60) }
         }
         .padding(.vertical, 1)
     }
@@ -486,26 +482,38 @@ struct BubbleView: View {
                     HStack(alignment: .bottom, spacing: 6) {
                         Text(msg.text.isEmpty ? " " : msg.text)
                             .font(.system(size: 16))
-                            .foregroundStyle(msg.isOutgoing ? Color.white : Color(.label))
+                            .foregroundStyle(.white)
                         metaInfo
                     }
                 } else {
                     HStack(spacing: 0) { Spacer(minLength: 0); metaInfo }
                 }
             }
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(bubbleBg, in: bubbleShape)
+            .padding(.horizontal, 10).padding(.vertical, 7)
+            .background {
+                ZStack(alignment: msg.isOutgoing ? .topTrailing : .topLeading) {
+                    RoundedRectangle(cornerRadius: 8).fill(bubbleColor)
+                    if showTail {
+                        BubbleTailShape(isOutgoing: msg.isOutgoing)
+                            .fill(bubbleColor)
+                            .frame(width: 10, height: 16)
+                            .offset(x: msg.isOutgoing ? 7 : -7)
+                    }
+                }
+            }
         }
     }
 
-    private var bubbleBg: some ShapeStyle {
-        msg.isOutgoing
-            ? AnyShapeStyle(outBubble)
-            : AnyShapeStyle(Color(.secondarySystemBackground))
+    private var bubbleColor: Color {
+        msg.isOutgoing ? waOutgoing : waIncoming
     }
 
-    private var bubbleShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 18)
+    private var bubbleBg: some ShapeStyle {
+        AnyShapeStyle(bubbleColor)
+    }
+
+    private var bubbleShape: some Shape {
+        RoundedRectangle(cornerRadius: 8)
     }
 
     // MARK: - Meta
@@ -517,15 +525,13 @@ struct BubbleView: View {
             if msg.isEdited {
                 Text("ред.")
                     .font(.system(size: 10))
-                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.75) : Color(.tertiaryLabel))
+                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.6) : waGray)
             }
             Text(msg.date.vkTime)
                 .font(.system(size: 11))
-                .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.75) : Color(.secondaryLabel))
+                .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.6) : waGray)
             if msg.isOutgoing {
-                Image(systemName: isRead ? "checkmark.circle.fill" : "checkmark")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(isRead ? Color.white : Color.white.opacity(0.65))
+                WADoubleCheck(isRead: isRead)
             }
         }
     }
@@ -535,16 +541,16 @@ struct BubbleView: View {
     func replyPreview(_ reply: VKReplyMessage) -> some View {
         HStack(spacing: 6) {
             RoundedRectangle(cornerRadius: 2)
-                .fill(msg.isOutgoing ? Color.white.opacity(0.8) : tgAccent)
+                .fill(waGreen)
                 .frame(width: 3)
             VStack(alignment: .leading, spacing: 1) {
                 Text(profiles[reply.fromId]?.firstName ?? "")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(msg.isOutgoing ? Color.white : tgAccent)
+                    .foregroundStyle(waGreen)
                     .lineLimit(1)
                 Text(reply.text.isEmpty ? attachmentLabel(reply.attachments) : reply.text)
                     .font(.system(size: 13))
-                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.8) : Color(.secondaryLabel))
+                    .foregroundStyle(.white.opacity(0.7))
                     .lineLimit(1)
             }
         }
@@ -558,16 +564,16 @@ struct BubbleView: View {
             ForEach(fwds) { fwd in
                 HStack(spacing: 6) {
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(Color(.tertiaryLabel))
+                        .fill(waGreen)
                         .frame(width: 2)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(profiles[fwd.fromId]?.firstName ?? "Пересланное")
                             .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(msg.isOutgoing ? Color.white : Color(.label))
+                            .foregroundStyle(waGreen)
                             .lineLimit(1)
                         Text(fwd.text.isEmpty ? attachmentLabel(fwd.attachments) : fwd.text)
                             .font(.system(size: 14))
-                            .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.85) : Color(.label))
+                            .foregroundStyle(.white.opacity(0.85))
                             .lineLimit(3)
                     }
                 }
@@ -594,9 +600,9 @@ struct BubbleView: View {
         default:
             HStack(spacing: 6) {
                 Image(systemName: "paperclip")
-                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.8) : tgAccent)
+                    .foregroundStyle(.white.opacity(0.7))
                 Text(att.type)
-                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.7) : Color(.secondaryLabel))
+                    .foregroundStyle(.white.opacity(0.5))
             }
         }
     }
@@ -614,9 +620,9 @@ struct BubbleView: View {
                     .clipped()
             } placeholder: {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.tertiarySystemBackground))
+                    .fill(waIncoming)
                     .frame(width: w, height: h)
-                    .overlay(ProgressView().tint(tgAccent))
+                    .overlay(ProgressView().tint(waGreen))
             }
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
@@ -632,13 +638,13 @@ struct BubbleView: View {
                         .frame(width: 240, height: 160).clipped()
                 } placeholder: {
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(.tertiarySystemBackground))
+                        .fill(waIncoming)
                         .frame(width: 240, height: 160)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             } else {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.tertiarySystemBackground))
+                    .fill(waIncoming)
                     .frame(width: 240, height: 160)
             }
             // Play button
@@ -664,34 +670,45 @@ struct BubbleView: View {
         if let title = video?.title, !title.isEmpty {
             Text(title)
                 .font(.system(size: 14))
-                .foregroundStyle(msg.isOutgoing ? Color.white : tgAccent)
+                .foregroundStyle(waGreen)
                 .lineLimit(2)
         }
     }
 
-    // Voice message
+    // Voice message — WhatsApp style
     func voiceView(_ audio: VKAudioMessage?) -> some View {
         let url     = audio?.linkMp3 ?? audio?.linkOgg ?? ""
         let playing = audioPlayer.currentURL == url && audioPlayer.isPlaying
 
         return HStack(spacing: 10) {
             Button { audioPlayer.toggle(url: url) } label: {
-                Image(systemName: playing ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: 36))
-                    .foregroundStyle(msg.isOutgoing ? Color.white : tgAccent)
+                ZStack {
+                    Circle()
+                        .fill(waGreen)
+                        .frame(width: 40, height: 40)
+                    Image(systemName: playing ? "pause.fill" : "play.fill")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.white)
+                        .offset(x: playing ? 0 : 2)
+                }
             }
             VStack(alignment: .leading, spacing: 4) {
                 WaveformView(
                     waveform: audio?.waveform ?? [],
                     progress: audioPlayer.currentURL == url ? audioPlayer.progress : 0,
-                    tint:     msg.isOutgoing ? Color.white : tgAccent
+                    tint:     .white.opacity(0.8)
                 )
-                .frame(height: 22)
-                .frame(maxWidth: 140)
-                Text(formatDuration(audio?.duration ?? 0))
-                    .font(.system(size: 12))
-                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.75) : Color(.secondaryLabel))
-                    .monospacedDigit()
+                .frame(height: 26)
+                .frame(maxWidth: 160)
+                HStack(spacing: 4) {
+                    Text(formatDuration(audio?.duration ?? 0))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .monospacedDigit()
+                    Circle()
+                        .fill(.white.opacity(0.5))
+                        .frame(width: 4, height: 4)
+                }
             }
         }
     }
@@ -711,20 +728,20 @@ struct BubbleView: View {
         HStack(spacing: 10) {
             ZStack {
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(tgAccent.opacity(0.15))
+                    .fill(waGreen.opacity(0.15))
                     .frame(width: 44, height: 44)
                 Image(systemName: docIcon(doc?.ext))
                     .font(.system(size: 22))
-                    .foregroundStyle(tgAccent)
+                    .foregroundStyle(waGreen)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(doc?.displayTitle ?? "Документ")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(msg.isOutgoing ? Color.white : Color(.label))
+                    .foregroundStyle(.white)
                     .lineLimit(1)
                 Text("\(doc?.ext?.uppercased() ?? "") · \(doc?.sizeFormatted ?? "")")
                     .font(.system(size: 12))
-                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.7) : Color(.secondaryLabel))
+                    .foregroundStyle(.white.opacity(0.5))
             }
         }
     }
@@ -734,25 +751,25 @@ struct BubbleView: View {
         HStack(spacing: 10) {
             Image(systemName: "music.note")
                 .font(.system(size: 18))
-                .foregroundStyle(msg.isOutgoing ? Color.white : tgAccent)
+                .foregroundStyle(waGreen)
                 .frame(width: 38, height: 38)
                 .background(
-                    Circle().fill(msg.isOutgoing ? Color.white.opacity(0.15) : tgAccent.opacity(0.15))
+                    Circle().fill(waGreen.opacity(0.15))
                 )
             VStack(alignment: .leading, spacing: 2) {
                 Text(audio?.title ?? "Аудио")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(msg.isOutgoing ? Color.white : Color(.label))
+                    .foregroundStyle(.white)
                     .lineLimit(1)
                 Text(audio?.artist ?? "")
                     .font(.system(size: 12))
-                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.7) : Color(.secondaryLabel))
+                    .foregroundStyle(.white.opacity(0.5))
                     .lineLimit(1)
             }
             Spacer()
             Text(audio?.durationFormatted ?? "")
                 .font(.system(size: 12))
-                .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.7) : Color(.secondaryLabel))
+                .foregroundStyle(.white.opacity(0.5))
                 .monospacedDigit()
         }
     }
@@ -770,13 +787,13 @@ struct BubbleView: View {
             if let title = link?.title, !title.isEmpty {
                 Text(title)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(msg.isOutgoing ? Color.white : tgAccent)
+                    .foregroundStyle(waGreen)
                     .lineLimit(2)
             }
             if let cap = link?.caption, !cap.isEmpty {
                 Text(cap)
                     .font(.system(size: 12))
-                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.7) : Color(.secondaryLabel))
+                    .foregroundStyle(.white.opacity(0.5))
                     .lineLimit(1)
             }
         }
@@ -787,15 +804,15 @@ struct BubbleView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Image(systemName: "doc.richtext")
-                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.8) : tgAccent)
+                    .foregroundStyle(waGreen.opacity(0.9))
                 Text("Запись на стене")
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(msg.isOutgoing ? Color.white : tgAccent)
+                    .foregroundStyle(waGreen)
             }
             if let text = wall?.text, !text.isEmpty {
                 Text(text)
                     .font(.system(size: 14))
-                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.9) : Color(.label))
+                    .foregroundStyle(.white.opacity(0.85))
                     .lineLimit(4)
             }
         }
@@ -823,8 +840,8 @@ struct BubbleView: View {
             } placeholder: { EmptyView() }
         } else {
             HStack {
-                Image(systemName: "gift.fill").foregroundStyle(tgAccent)
-                Text("Подарок").foregroundStyle(msg.isOutgoing ? Color.white : Color(.label))
+                Image(systemName: "gift.fill").foregroundStyle(waGreen)
+                Text("Подарок").foregroundStyle(.white)
             }
         }
     }
@@ -834,25 +851,25 @@ struct BubbleView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Image(systemName: "chart.bar.fill")
-                    .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.8) : tgAccent)
+                    .foregroundStyle(waGreen.opacity(0.9))
                 Text(poll?.question ?? "Опрос")
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(msg.isOutgoing ? Color.white : Color(.label))
+                    .foregroundStyle(.white)
             }
             ForEach(poll?.answers ?? []) { answer in
                 VStack(alignment: .leading, spacing: 2) {
                     HStack {
                         Text(answer.text ?? "")
                             .font(.system(size: 13))
-                            .foregroundStyle(msg.isOutgoing ? Color.white : Color(.label))
+                            .foregroundStyle(.white)
                         Spacer()
                         Text("\(answer.votes ?? 0)")
                             .font(.system(size: 12))
-                            .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.7) : Color(.secondaryLabel))
+                            .foregroundStyle(.white.opacity(0.5))
                     }
                     GeometryReader { g in
                         RoundedRectangle(cornerRadius: 2)
-                            .fill(msg.isOutgoing ? Color.white.opacity(0.4) : tgAccent.opacity(0.35))
+                            .fill(waGreen.opacity(0.35))
                             .frame(width: g.size.width * (answer.rate ?? 0) / 100)
                     }
                     .frame(height: 3)
@@ -860,7 +877,7 @@ struct BubbleView: View {
             }
             Text("\(poll?.votes ?? 0) голосов")
                 .font(.system(size: 12))
-                .foregroundStyle(msg.isOutgoing ? Color.white.opacity(0.7) : Color(.secondaryLabel))
+                .foregroundStyle(.white.opacity(0.5))
         }
     }
 
@@ -928,7 +945,7 @@ struct BubbleView: View {
 struct WaveformView: View {
     let waveform: [Int]
     let progress: Double
-    var tint: Color = tgAccent
+    var tint: Color = waGreen
 
     var body: some View {
         GeometryReader { g in
@@ -966,7 +983,7 @@ struct TypingDots: View {
         HStack(spacing: 3) {
             ForEach(0..<3, id: \.self) { i in
                 Circle()
-                    .fill(Color(.secondaryLabel))
+                    .fill(waGray)
                     .frame(width: 5, height: 5)
                     .scaleEffect(phase == i ? 1.3 : 0.9)
                     .animation(.easeInOut(duration: 0.4).repeatForever().delay(Double(i) * 0.15),
@@ -1013,18 +1030,18 @@ struct InlineVideoMessageView: View {
                             .clipShape(Circle())
                     } placeholder: {
                         Circle()
-                            .fill(Color(.tertiarySystemBackground))
+                            .fill(waIncoming)
                             .frame(width: 200, height: 200)
-                            .overlay(ProgressView().tint(tgAccent))
+                            .overlay(ProgressView().tint(waGreen))
                     }
                 } else {
                     Circle()
-                        .fill(Color(.tertiarySystemBackground))
+                        .fill(waIncoming)
                         .frame(width: 200, height: 200)
                         .overlay(
                             Image(systemName: "video.circle")
                                 .font(.system(size: 44))
-                                .foregroundStyle(Color(.secondaryLabel))
+                                .foregroundStyle(waGray)
                         )
                 }
                 // Play button overlay
@@ -1043,7 +1060,7 @@ struct InlineVideoMessageView: View {
             if isPlaying {
                 Circle()
                     .trim(from: 0, to: progress)
-                    .stroke(tgAccent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .stroke(waGreen, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                     .frame(width: 200, height: 200)
                     .rotationEffect(.degrees(-90))
                     .animation(.linear(duration: 0.1), value: progress)
@@ -1129,7 +1146,7 @@ struct RecordingWaveformView: View {
             HStack(spacing: 1.5) {
                 ForEach(Array(displaySamples.enumerated()), id: \.offset) { _, h in
                     RoundedRectangle(cornerRadius: 1)
-                        .fill(tgAccent)
+                        .fill(waGreen)
                         .frame(width: 2.5, height: max(2, h * g.size.height))
                 }
             }
@@ -1174,5 +1191,51 @@ struct TGWallpaper: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - WhatsApp Double Check (✓✓)
+
+struct WADoubleCheck: View {
+    let isRead: Bool
+
+    var body: some View {
+        HStack(spacing: -3) {
+            Image(systemName: "checkmark")
+            Image(systemName: "checkmark")
+        }
+        .font(.system(size: 10, weight: .bold))
+        .foregroundStyle(isRead ? waCheckRead : .white.opacity(0.55))
+    }
+}
+
+// MARK: - Bubble Tail Shape
+
+struct BubbleTailShape: Shape {
+    let isOutgoing: Bool
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        if isOutgoing {
+            // Tail pointing right-up
+            p.move(to: CGPoint(x: 0, y: 0))
+            p.addLine(to: CGPoint(x: rect.maxX, y: 0))
+            p.addCurve(
+                to: CGPoint(x: 0, y: rect.maxY),
+                control1: CGPoint(x: rect.maxX * 0.6, y: 0),
+                control2: CGPoint(x: 0, y: rect.maxY * 0.4)
+            )
+        } else {
+            // Tail pointing left-up
+            p.move(to: CGPoint(x: rect.maxX, y: 0))
+            p.addLine(to: CGPoint(x: 0, y: 0))
+            p.addCurve(
+                to: CGPoint(x: rect.maxX, y: rect.maxY),
+                control1: CGPoint(x: rect.maxX * 0.4, y: 0),
+                control2: CGPoint(x: rect.maxX, y: rect.maxY * 0.4)
+            )
+        }
+        p.closeSubpath()
+        return p
     }
 }
