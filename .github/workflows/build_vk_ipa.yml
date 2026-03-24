@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - claude/ios-vk-client-liquid-glass-4JT1A
+      - claude/vk-client-ui-design-j01rc
       - main
   workflow_dispatch:
 
