@@ -3,12 +3,18 @@ import SwiftUI
 // Telegram-inspired blue accent used across all screens
 let tgAccent = Color(red: 0.16, green: 0.65, blue: 0.93)
 
+struct ChatDestination: Hashable {
+    let peerId: Int
+    let peerName: String
+}
+
 // MARK: - Chats List
 
 struct ChatsListView: View {
     @StateObject private var vm     = ChatsViewModel()
     @State private var search       = ""
     @State private var filter       = "Все"
+    @State private var path         = NavigationPath()
 
     private let filters = ["Все", "Личные", "Группы"]
 
@@ -24,7 +30,7 @@ struct ChatsListView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             VStack(spacing: 0) {
                 filterBar
                 Divider().opacity(0.4)
@@ -42,10 +48,15 @@ struct ChatsListView: View {
             .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always),
                         prompt: "Поиск")
             .toolbar { toolbarItems }
+            .navigationDestination(for: ChatDestination.self) { dest in
+                ChatView(peerId: dest.peerId, peerName: dest.peerName)
+            }
             .alert("Ошибка", isPresented: .constant(vm.error != nil)) {
                 Button("OK") { vm.error = nil }
             } message: { Text(vm.error ?? "") }
         }
+        .toolbarVisibility(path.isEmpty ? .automatic : .hidden, for: .tabBar)
+        .animation(.easeInOut(duration: 0.25), value: path.isEmpty)
         .tint(tgAccent)
         .task { await vm.load() }
     }
@@ -84,7 +95,7 @@ struct ChatsListView: View {
         ScrollView {
             LazyVStack(spacing: 0) {
                 ForEach(shown) { item in
-                    NavigationLink(destination: ChatView(
+                    NavigationLink(value: ChatDestination(
                         peerId:   item.conversation.peer.id,
                         peerName: vm.displayName(for: item)
                     )) {

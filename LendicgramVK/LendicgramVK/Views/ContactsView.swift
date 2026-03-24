@@ -3,6 +3,7 @@ import SwiftUI
 struct ContactsView: View {
     @StateObject private var vm = ContactsViewModel()
     @State private var search = ""
+    @State private var path   = NavigationPath()
 
     private var filtered: [VKUser] {
         guard !search.isEmpty else { return vm.friends }
@@ -10,7 +11,7 @@ struct ContactsView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
                 if vm.isLoading && vm.friends.isEmpty {
                     HStack { Spacer(); ProgressView().tint(tgAccent); Spacer() }
@@ -37,14 +38,19 @@ struct ContactsView: View {
             .navigationTitle("Контакты")
             .navigationBarTitleDisplayMode(.large)
             .searchable(text: $search, prompt: "Поиск друзей")
+            .navigationDestination(for: ChatDestination.self) { dest in
+                ChatView(peerId: dest.peerId, peerName: dest.peerName)
+            }
         }
+        .toolbarVisibility(path.isEmpty ? .automatic : .hidden, for: .tabBar)
+        .animation(.easeInOut(duration: 0.25), value: path.isEmpty)
         .tint(tgAccent)
         .task { await vm.load() }
     }
 
     @ViewBuilder
     func friendRow(_ user: VKUser) -> some View {
-        NavigationLink(destination: ChatView(peerId: user.id, peerName: user.fullName)) {
+        NavigationLink(value: ChatDestination(peerId: user.id, peerName: user.fullName)) {
             HStack(spacing: 12) {
                 ZStack(alignment: .bottomTrailing) {
                     VKAvatarView(url: user.avatarURL, name: user.fullName, size: 46)
