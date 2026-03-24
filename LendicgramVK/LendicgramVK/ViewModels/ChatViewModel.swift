@@ -22,66 +22,57 @@ final class ChatViewModel: ObservableObject {
     private let longPoll = VKLongPollService.shared
     private var bag      = Set<AnyCancellable>()
     private var typingTimers: [Int: Task<Void, Never>] = [:]
-    private let fetchTrigger = PassthroughSubject<Void, Never>()
+    private var pollTimer: Task<Void, Never>?
 
     init(peerId: Int, peerName: String) {
         self.peerId   = peerId
         self.peerName = peerName
+        setupSubscriptions()
+    }
 
-        // Debounced fetch — collapses rapid LP events into one API call
-        fetchTrigger
-            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
-            .sink { [weak self] in
-                Task { await self?.fetchLatest() }
-            }
-            .store(in: &bag)
-
-        // New message — instant feedback + background data refresh
+    /// Set up LP subscriptions using MainActor.run to guarantee SwiftUI observability
+    private func setupSubscriptions() {
         longPoll.newMessageSubject
-            .filter { [peerId] in $0.peerId == peerId }
-            .receive(on: DispatchQueue.main)
             .sink { [weak self] msg in
-                guard let self = self else { return }
-                // Instant: append message immediately for real-time feel
-                if !self.messages.contains(where: { $0.id == msg.id }) {
-                    self.messages.append(msg)
+                Task { @MainActor [weak self] in
+                    guard let self = self, msg.peerId == self.peerId else { return }
+                    if !self.messages.contains(where: { $0.id == msg.id }) {
+                        self.messages.append(msg)
+                    }
+                    self.typingUserIds.remove(msg.fromId)
+                    self.typingTimers[msg.fromId]?.cancel()
+                    if !msg.isOutgoing {
+                        await self.markAsRead()
+                    }
+                    await self.fetchLatest()
                 }
-                // Clear typing indicator for sender
-                self.typingUserIds.remove(msg.fromId)
-                self.typingTimers[msg.fromId]?.cancel()
-                // Mark incoming as read
-                if !msg.isOutgoing {
-                    Task { await self.markAsRead() }
-                }
-                // Fetch full data (attachments, profiles) in background
-                self.fetchTrigger.send()
             }
             .store(in: &bag)
 
-        // Read event (they read our messages)
         longPoll.readSubject
-            .filter { [peerId] in $0.peerId == peerId }
-            .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
-                self?.outRead = max(self?.outRead ?? 0, event.msgId)
+                Task { @MainActor [weak self] in
+                    guard let self = self, event.peerId == self.peerId else { return }
+                    self.outRead = max(self.outRead, event.msgId)
+                }
             }
             .store(in: &bag)
 
-        // Online status
         longPoll.onlineSubject
-            .filter { [peerId] in $0.userId == peerId }
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                Task { await self?.refreshPeerUser() }
+            .sink { [weak self] event in
+                Task { @MainActor [weak self] in
+                    guard let self = self, event.userId == self.peerId else { return }
+                    await self.refreshPeerUser()
+                }
             }
             .store(in: &bag)
 
-        // Typing
         longPoll.typingSubject
-            .filter { [peerId] in $0.peerId == peerId }
-            .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
-                self?.handleTyping(userId: event.userId)
+                Task { @MainActor [weak self] in
+                    guard let self = self, event.peerId == self.peerId else { return }
+                    self.handleTyping(userId: event.userId)
+                }
             }
             .store(in: &bag)
     }
@@ -110,6 +101,24 @@ final class ChatViewModel: ObservableObject {
         if !longPoll.isRunning {
             Task { await longPoll.start() }
         }
+        // Start periodic polling as fallback for missed LP events
+        startPolling()
+    }
+
+    /// Periodic fallback: fetch new messages every 3s while chat is open
+    private func startPolling() {
+        pollTimer?.cancel()
+        pollTimer = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3))
+                guard !Task.isCancelled else { break }
+                await self?.fetchLatest()
+            }
+        }
+    }
+
+    deinit {
+        pollTimer?.cancel()
     }
 
     func fetchLatest() async {
