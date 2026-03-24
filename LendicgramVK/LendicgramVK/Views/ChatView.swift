@@ -18,7 +18,6 @@ struct ChatView: View {
     @State private var input         = ""
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var showStickers  = false
-    @Environment(\.dismiss) private var dismiss
 
     init(peerId: Int, peerName: String) {
         self.peerId   = peerId
@@ -45,10 +44,8 @@ struct ChatView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
         .toolbar { chatToolbar }
         .toolbarVisibility(.hidden, for: .tabBar)
-        .enableSwipeBack()
         .tint(tgAccent)
         .alert("Ошибка", isPresented: .constant(vm.error != nil)) {
             Button("OK") { vm.error = nil }
@@ -219,16 +216,6 @@ struct ChatView: View {
 
     @ToolbarContentBuilder
     var chatToolbar: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarLeading) {
-            Button { dismiss() } label: {
-                HStack(spacing: 2) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 17, weight: .semibold))
-                    Text("Назад").font(.system(size: 17))
-                }
-                .foregroundStyle(tgAccent)
-            }
-        }
         ToolbarItem(placement: .principal) {
             VStack(spacing: 1) {
                 Text(peerName)

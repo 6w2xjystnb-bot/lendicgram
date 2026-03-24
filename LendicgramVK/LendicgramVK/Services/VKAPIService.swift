@@ -182,6 +182,7 @@ final class VKAPIService {
             "type": "stickers",
             "filters": "active",
             "extended": "1",
+            "need_stickers": "1",
         ])
     }
 
