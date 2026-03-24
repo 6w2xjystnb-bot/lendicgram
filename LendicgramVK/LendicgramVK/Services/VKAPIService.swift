@@ -167,6 +167,24 @@ final class VKAPIService {
         ])
     }
 
+    // MARK: - Stickers
+
+    func sendSticker(peerId: Int, stickerId: Int) async throws -> Int {
+        try await get("messages.send", [
+            "peer_id":    "\(peerId)",
+            "sticker_id": "\(stickerId)",
+            "random_id":  "\(Int.random(in: 1...999_999_999))",
+        ])
+    }
+
+    func getStickersProducts() async throws -> VKStickersResponse {
+        try await get("store.getProducts", [
+            "type": "stickers",
+            "filters": "active",
+            "extended": "1",
+        ])
+    }
+
     // MARK: - Long Poll
 
     func getLongPollServer() async throws -> VKLongPollServer {

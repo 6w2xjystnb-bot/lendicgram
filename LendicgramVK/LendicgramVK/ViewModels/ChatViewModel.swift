@@ -162,6 +162,26 @@ final class ChatViewModel: ObservableObject {
         isSending = false
     }
 
+    // MARK: - Stickers
+
+    @Published var stickerPacks: [VKStickerProduct] = []
+
+    func loadStickers() async {
+        do {
+            let r = try await api.getStickersProducts()
+            stickerPacks = r.items
+        } catch {}
+    }
+
+    func sendSticker(stickerId: Int) async {
+        isSending = true
+        do {
+            _ = try await api.sendSticker(peerId: peerId, stickerId: stickerId)
+            await fetchLatest()
+        } catch { self.error = error.localizedDescription }
+        isSending = false
+    }
+
     // MARK: - Read
 
     func markAsRead() async {

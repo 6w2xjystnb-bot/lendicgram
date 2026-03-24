@@ -570,6 +570,36 @@ enum LPValue: Decodable {
     var stringValue: String? { if case .string(let s) = self { return s }; return nil }
 }
 
+// MARK: - Sticker Products
+
+struct VKStickerProduct: Decodable, Identifiable {
+    let id: Int
+    let title: String?
+    let stickers: [VKProductSticker]?
+    let previews: [VKStickerImage]?
+    enum CodingKeys: String, CodingKey { case id; case title; case stickers; case previews }
+}
+
+struct VKProductSticker: Decodable, Identifiable {
+    let stickerId: Int
+    let images: [VKStickerImage]?
+    let imagesWithBackground: [VKStickerImage]?
+    var id: Int { stickerId }
+    var bestURL: URL? {
+        let imgs = images ?? imagesWithBackground ?? []
+        return imgs.max(by: { $0.width < $1.width }).flatMap { URL(string: $0.url) }
+    }
+    enum CodingKeys: String, CodingKey {
+        case stickerId = "sticker_id"; case images
+        case imagesWithBackground = "images_with_background"
+    }
+}
+
+struct VKStickersResponse: Decodable {
+    let count: Int
+    let items: [VKStickerProduct]
+}
+
 // MARK: - Time formatting
 
 extension Int {
