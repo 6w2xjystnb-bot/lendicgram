@@ -67,7 +67,7 @@ struct ChatsListView: View {
                                 if filter == f {
                                     Capsule().fill(tgAccent)
                                 } else {
-                                    Capsule().fill(.clear).glassEffect(.regular.interactive, in: .capsule)
+                                    Capsule().fill(.clear).glassEffect(.regular.interactive(), in: .capsule)
                                 }
                             }
                     }

@@ -157,7 +157,7 @@ struct ChatView: View {
                     .font(.system(size: 22))
                     .foregroundStyle(Color(.secondaryLabel))
                     .frame(width: 44, height: 44)
-                    .glassEffect(.regular.interactive, in: .circle)
+                    .glassEffect(.regular.interactive(), in: .circle)
             }
 
             // ── Bubble 2: text field ─────────────────────────────────
@@ -182,7 +182,7 @@ struct ChatView: View {
                 }
             }
             .padding(.horizontal, 14)
-            .glassEffect(.regular.interactive, in: .capsule)
+            .glassEffect(.regular.interactive(), in: .capsule)
             .frame(maxWidth: .infinity)
 
             // ── Bubble 3: mic / send ─────────────────────────────────
@@ -203,7 +203,7 @@ struct ChatView: View {
                 .frame(width: 44, height: 44)
                 .background {
                     if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Circle().fill(.clear).glassEffect(.regular.interactive, in: .circle)
+                        Circle().fill(.clear).glassEffect(.regular.interactive(), in: .circle)
                     } else {
                         Circle().fill(tgAccent)
                     }
