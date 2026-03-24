@@ -157,7 +157,7 @@ struct ChatView: View {
                     .font(.system(size: 22))
                     .foregroundStyle(Color(.secondaryLabel))
                     .frame(width: 44, height: 44)
-                    .background(.ultraThinMaterial, in: Circle())
+                    .glassEffect(.regular.interactive, in: .circle)
             }
 
             // ── Bubble 2: text field ─────────────────────────────────
@@ -182,20 +182,14 @@ struct ChatView: View {
                 }
             }
             .padding(.horizontal, 14)
-            .background(.ultraThinMaterial, in: Capsule())
+            .glassEffect(.regular.interactive, in: .capsule)
             .frame(maxWidth: .infinity)
 
             // ── Bubble 3: mic / send ─────────────────────────────────
             Button(action: {
                 Task { await vm.send(text: input); input = "" }
             }) {
-                ZStack {
-                    Circle()
-                        .fill(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                              ? AnyShapeStyle(.ultraThinMaterial)
-                              : AnyShapeStyle(tgAccent))
-                        .frame(width: 44, height: 44)
-
+                Group {
                     if vm.isSending {
                         ProgressView().tint(.white)
                     } else {
@@ -204,6 +198,14 @@ struct ChatView: View {
                             .font(.system(size: 20, weight: .medium))
                             .foregroundStyle(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                                              ? Color(.secondaryLabel) : .white)
+                    }
+                }
+                .frame(width: 44, height: 44)
+                .background {
+                    if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Circle().fill(.clear).glassEffect(.regular.interactive, in: .circle)
+                    } else {
+                        Circle().fill(tgAccent)
                     }
                 }
             }

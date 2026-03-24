@@ -25,20 +25,16 @@ struct ChatsListView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color(.systemBackground).ignoresSafeArea()
+            VStack(spacing: 0) {
+                filterBar
+                Divider().opacity(0.4)
 
-                VStack(spacing: 0) {
-                    filterBar
-                    Divider().opacity(0.4)
-
-                    if vm.isLoading && vm.items.isEmpty {
-                        Spacer()
-                        ProgressView().tint(tgAccent)
-                        Spacer()
-                    } else {
-                        chatList
-                    }
+                if vm.isLoading && vm.items.isEmpty {
+                    Spacer()
+                    ProgressView().tint(tgAccent)
+                    Spacer()
+                } else {
+                    chatList
                 }
             }
             .navigationTitle("Сообщения")
@@ -66,12 +62,14 @@ struct ChatsListView: View {
                         Text(f)
                             .font(.system(size: 14, weight: .medium))
                             .padding(.horizontal, 14).padding(.vertical, 7)
-                            .background(
-                                Capsule().fill(filter == f
-                                    ? tgAccent
-                                    : Color(.secondarySystemBackground))
-                            )
                             .foregroundStyle(filter == f ? Color.white : Color(.label))
+                            .background {
+                                if filter == f {
+                                    Capsule().fill(tgAccent)
+                                } else {
+                                    Capsule().fill(.clear).glassEffect(.regular.interactive, in: .capsule)
+                                }
+                            }
                     }
                     .buttonStyle(.plain)
                 }
@@ -207,7 +205,6 @@ struct ChatRow: View {
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 10)
-        .background(Color(.systemBackground))
         .contentShape(Rectangle())
     }
 }

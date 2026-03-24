@@ -54,7 +54,7 @@ struct StickerKeyboardView: View {
                 .padding(.vertical, 6)
             }
         }
-        .background(.ultraThinMaterial)
+        .background(.thinMaterial)
     }
 
     // MARK: - Subviews
