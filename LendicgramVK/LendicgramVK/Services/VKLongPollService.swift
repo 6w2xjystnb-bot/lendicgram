@@ -6,17 +6,18 @@ final class VKLongPollService: ObservableObject {
     static let shared = VKLongPollService()
     private init() {}
 
-    // Events
-    @Published var newMessage: VKAPIMessage?              = nil
-    @Published var readEvent:  (peerId: Int, msgId: Int)? = nil   // event 7: they read our msgs
-    @Published var readInEvent:(peerId: Int, msgId: Int)? = nil   // event 6: we read their msgs
-    @Published var onlineEvent:(userId: Int, online: Bool, platform: Int)? = nil
-    @Published var typingEvent:(userId: Int, peerId: Int)? = nil
+    // Events — PassthroughSubject guarantees no dropped events under rapid fire
+    let newMessageSubject = PassthroughSubject<VKAPIMessage, Never>()
+    let readSubject       = PassthroughSubject<(peerId: Int, msgId: Int), Never>()
+    let readInSubject     = PassthroughSubject<(peerId: Int, msgId: Int), Never>()
+    let onlineSubject     = PassthroughSubject<(userId: Int, online: Bool, platform: Int), Never>()
+    let typingSubject     = PassthroughSubject<(userId: Int, peerId: Int), Never>()
 
     private var server = ""
     private var key    = ""
     private var ts     = ""
     private var pollTask: Task<Void, Never>?
+    private var retryDelay: UInt64 = 1  // exponential backoff seconds
 
     var isRunning: Bool { pollTask != nil && !(pollTask?.isCancelled ?? true) }
 
@@ -42,8 +43,8 @@ final class VKLongPollService: ObservableObject {
 
     private func poll() async {
         guard !server.isEmpty else { return }
-        // mode: 2 (attachments) + 64 (online notifications)
-        let urlStr = "https://\(server)?act=a_check&key=\(key)&ts=\(ts)&wait=25&mode=66&version=3"
+        // mode: 2 (attachments) + 8 (extended) + 32 (pts) + 64 (online) + 128 (random_id) = 234
+        let urlStr = "https://\(server)?act=a_check&key=\(key)&ts=\(ts)&wait=25&mode=234&version=3"
         guard let url = URL(string: urlStr) else { return }
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
@@ -57,11 +58,13 @@ final class VKLongPollService: ObservableObject {
                 }
                 return
             }
+            retryDelay = 1  // reset backoff on success
             ts = resp.ts
             for update in resp.updates ?? [] { handle(update) }
         } catch {
             if !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(3))
+                try? await Task.sleep(for: .seconds(retryDelay))
+                retryDelay = min(retryDelay * 2, 30)  // cap at 30s
             }
         }
     }
@@ -94,47 +97,47 @@ final class VKLongPollService: ObservableObject {
                 updateTime: nil,
                 important: nil
             )
-            newMessage = msg
+            newMessageSubject.send(msg)
 
         // Event 6: read incoming messages (we read their messages)
         case 6:
             guard u.count >= 3 else { return }
             let peerId  = u[1].intValue ?? 0
             let localId = u[2].intValue ?? 0
-            readInEvent = (peerId: peerId, msgId: localId)
+            readInSubject.send((peerId: peerId, msgId: localId))
 
         // Event 7: read outgoing messages (they read our messages)
         case 7:
             guard u.count >= 3 else { return }
             let peerId  = u[1].intValue ?? 0
             let localId = u[2].intValue ?? 0
-            readEvent = (peerId: peerId, msgId: localId)
+            readSubject.send((peerId: peerId, msgId: localId))
 
         // Event 8: friend online
         case 8:
             guard u.count >= 3 else { return }
             let userId   = -(u[1].intValue ?? 0)
             let platform = u[2].intValue ?? 0
-            onlineEvent = (userId: userId, online: true, platform: platform)
+            onlineSubject.send((userId: userId, online: true, platform: platform))
 
         // Event 9: friend offline
         case 9:
             guard u.count >= 2 else { return }
             let userId = -(u[1].intValue ?? 0)
-            onlineEvent = (userId: userId, online: false, platform: 0)
+            onlineSubject.send((userId: userId, online: false, platform: 0))
 
         // Event 61: typing in dialog
         case 61:
             guard u.count >= 2 else { return }
             let userId = u[1].intValue ?? 0
-            typingEvent = (userId: userId, peerId: userId)
+            typingSubject.send((userId: userId, peerId: userId))
 
         // Event 62: typing in chat
         case 62:
             guard u.count >= 3 else { return }
             let peerId = u[1].intValue ?? 0
             let userId = u[2].intValue ?? 0
-            typingEvent = (userId: userId, peerId: peerId)
+            typingSubject.send((userId: userId, peerId: peerId))
 
         default:
             break

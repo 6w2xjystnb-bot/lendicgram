@@ -14,42 +14,40 @@ final class ChatsViewModel: ObservableObject {
     private let longPoll = VKLongPollService.shared
     private var bag      = Set<AnyCancellable>()
     private var typingTimers: [Int: Task<Void, Never>] = [:]
+    private let fetchTrigger = PassthroughSubject<Void, Never>()
 
     init() {
-        longPoll.$newMessage
-            .compactMap { $0 }
+        // Debounced fetch — collapses rapid LP events into one API call
+        fetchTrigger
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { [weak self] in
+                Task { await self?.fetch() }
+            }
+            .store(in: &bag)
+
+        longPoll.newMessageSubject
             .receive(on: DispatchQueue.main)
             .sink { [weak self] msg in self?.onNewMessage(msg) }
             .store(in: &bag)
 
-        longPoll.$onlineEvent
-            .compactMap { $0 }
+        longPoll.onlineSubject
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
-                guard let self = self else { return }
-                // Refresh profiles for online status update
-                Task { await self.refreshUser(event.userId) }
+                Task { await self?.refreshUser(event.userId) }
             }
             .store(in: &bag)
 
-        longPoll.$typingEvent
-            .compactMap { $0 }
+        longPoll.typingSubject
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
                 self?.handleTyping(userId: event.userId, peerId: event.peerId)
             }
             .store(in: &bag)
 
-        longPoll.$readInEvent
-            .compactMap { $0 }
+        longPoll.readInSubject
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] event in
-                // Clear unread count for this peer
-                guard let self = self,
-                      let idx = self.items.firstIndex(where: { $0.conversation.peer.id == event.peerId })
-                else { return }
-                // Re-fetch to update unread counts
-                Task { await self.fetch() }
+            .sink { [weak self] _ in
+                self?.fetchTrigger.send()
             }
             .store(in: &bag)
     }
@@ -83,8 +81,8 @@ final class ChatsViewModel: ObservableObject {
         // Clear typing for this peer
         typingPeers.removeValue(forKey: msg.peerId)
         typingTimers[msg.peerId]?.cancel()
-        // Refresh conversations
-        Task { await fetch() }
+        // Debounced refresh
+        fetchTrigger.send()
     }
 
     private func handleTyping(userId: Int, peerId: Int) {

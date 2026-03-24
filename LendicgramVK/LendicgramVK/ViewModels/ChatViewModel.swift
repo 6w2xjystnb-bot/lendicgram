@@ -22,24 +22,31 @@ final class ChatViewModel: ObservableObject {
     private let longPoll = VKLongPollService.shared
     private var bag      = Set<AnyCancellable>()
     private var typingTimers: [Int: Task<Void, Never>] = [:]
+    private let fetchTrigger = PassthroughSubject<Void, Never>()
 
     init(peerId: Int, peerName: String) {
         self.peerId   = peerId
         self.peerName = peerName
 
-        // New message
-        longPoll.$newMessage
-            .compactMap { $0 }
-            .filter { [peerId] in $0.peerId == peerId }
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
+        // Debounced fetch — collapses rapid LP events into one API call
+        fetchTrigger
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
+            .sink { [weak self] in
                 Task { await self?.fetchLatest() }
             }
             .store(in: &bag)
 
+        // New message
+        longPoll.newMessageSubject
+            .filter { [peerId] in $0.peerId == peerId }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.fetchTrigger.send()
+            }
+            .store(in: &bag)
+
         // Read event (they read our messages)
-        longPoll.$readEvent
-            .compactMap { $0 }
+        longPoll.readSubject
             .filter { [peerId] in $0.peerId == peerId }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
@@ -48,24 +55,16 @@ final class ChatViewModel: ObservableObject {
             .store(in: &bag)
 
         // Online status
-        longPoll.$onlineEvent
-            .compactMap { $0 }
+        longPoll.onlineSubject
+            .filter { [peerId] in $0.userId == peerId }
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] event in
-                guard let self = self else { return }
-                if var u = self.profiles[event.userId] {
-                    // Can't mutate struct fields directly, re-fetch instead
-                    Task { await self.refreshPeerUser() }
-                }
-                if event.userId == peerId {
-                    Task { await self.refreshPeerUser() }
-                }
+            .sink { [weak self] _ in
+                Task { await self?.refreshPeerUser() }
             }
             .store(in: &bag)
 
         // Typing
-        longPoll.$typingEvent
-            .compactMap { $0 }
+        longPoll.typingSubject
             .filter { [peerId] in $0.peerId == peerId }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
@@ -104,7 +103,14 @@ final class ChatViewModel: ObservableObject {
         do {
             let r = try await api.getHistory(peerId: peerId, count: 20)
             let existingIds = Set(messages.map { $0.id })
-            let newMsgs = r.items.reversed().filter { !existingIds.contains($0.id) }
+            var newMsgs = r.items.reversed().filter { !existingIds.contains($0.id) }
+            // Also update existing messages (edits, attachment resolution)
+            for updated in r.items {
+                if let idx = messages.firstIndex(where: { $0.id == updated.id }),
+                   messages[idx].attachments == nil && updated.attachments != nil {
+                    messages[idx] = updated
+                }
+            }
             if !newMsgs.isEmpty {
                 messages.append(contentsOf: newMsgs)
                 r.profiles?.forEach { profiles[$0.id] = $0 }
@@ -114,7 +120,19 @@ final class ChatViewModel: ObservableObject {
             if newMsgs.contains(where: { !$0.isOutgoing }) {
                 await markAsRead()
             }
-        } catch {}
+        } catch {
+            // Retry once after 1s on failure
+            try? await Task.sleep(for: .seconds(1))
+            if let r = try? await api.getHistory(peerId: peerId, count: 20) {
+                let existingIds = Set(messages.map { $0.id })
+                let newMsgs = r.items.reversed().filter { !existingIds.contains($0.id) }
+                if !newMsgs.isEmpty {
+                    messages.append(contentsOf: newMsgs)
+                    r.profiles?.forEach { profiles[$0.id] = $0 }
+                    r.groups?.forEach   { groups[-$0.id]  = $0 }
+                }
+            }
+        }
     }
 
     func loadMore() async {
