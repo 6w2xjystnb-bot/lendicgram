@@ -103,7 +103,7 @@ final class ChatViewModel: ObservableObject {
         do {
             let r = try await api.getHistory(peerId: peerId, count: 20)
             let existingIds = Set(messages.map { $0.id })
-            var newMsgs = r.items.reversed().filter { !existingIds.contains($0.id) }
+            let newMsgs = r.items.reversed().filter { !existingIds.contains($0.id) }
             // Also update existing messages (edits, attachment resolution)
             for updated in r.items {
                 if let idx = messages.firstIndex(where: { $0.id == updated.id }),

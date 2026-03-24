@@ -12,8 +12,7 @@ final class ContactsViewModel: ObservableObject {
     private var bag      = Set<AnyCancellable>()
 
     init() {
-        longPoll.$onlineEvent
-            .compactMap { $0 }
+        longPoll.onlineSubject
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
                 guard let self = self,
