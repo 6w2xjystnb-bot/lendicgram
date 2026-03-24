@@ -45,7 +45,6 @@ struct ChatView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { chatToolbar }
-        .toolbarVisibility(.hidden, for: .tabBar)
         .tint(tgAccent)
         .alert("Ошибка", isPresented: .constant(vm.error != nil)) {
             Button("OK") { vm.error = nil }

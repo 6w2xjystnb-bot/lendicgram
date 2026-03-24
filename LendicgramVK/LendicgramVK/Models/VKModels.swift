@@ -419,8 +419,15 @@ struct VKSticker: Decodable {
     var bestURL: URL? {
         // Use transparent images; fall back to background variants only if needed
         let imgs = images ?? imagesWithBackground ?? []
-        return imgs.max(by: { $0.width < $1.width })
-            .flatMap { URL(string: $0.url) }
+        if let best = imgs.max(by: { $0.width < $1.width }),
+           let url = URL(string: best.url) {
+            return url
+        }
+        // Fallback: VK serves sticker PNGs at this well-known URL pattern
+        if let sid = stickerId {
+            return URL(string: "https://vk.com/sticker/1-\(sid)-256")
+        }
+        return nil
     }
     enum CodingKeys: String, CodingKey {
         case stickerId = "sticker_id"; case productId = "product_id"
@@ -587,7 +594,12 @@ struct VKProductSticker: Decodable, Identifiable {
     var id: Int { stickerId }
     var bestURL: URL? {
         let imgs = images ?? imagesWithBackground ?? []
-        return imgs.max(by: { $0.width < $1.width }).flatMap { URL(string: $0.url) }
+        if let best = imgs.max(by: { $0.width < $1.width }),
+           let url = URL(string: best.url) {
+            return url
+        }
+        // Fallback: VK serves sticker PNGs at this well-known URL pattern
+        return URL(string: "https://vk.com/sticker/1-\(stickerId)-128")
     }
     enum CodingKeys: String, CodingKey {
         case stickerId = "sticker_id"; case images
