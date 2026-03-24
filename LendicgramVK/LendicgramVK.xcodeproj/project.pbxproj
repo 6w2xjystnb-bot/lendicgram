@@ -30,6 +30,8 @@
 		B021 /* StickerKeyboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F021; };
 		B022 /* ChatBackgroundView.swift in Sources */  = {isa = PBXBuildFile; fileRef = F022; };
 		B023 /* SwipeBackModifier.swift in Sources */   = {isa = PBXBuildFile; fileRef = F023; };
+		B024 /* AudioRecorderService.swift in Sources */  = {isa = PBXBuildFile; fileRef = F024; };
+		B025 /* VideoMessageRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F025; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -56,6 +58,8 @@
 		F021 /* StickerKeyboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/StickerKeyboardView.swift";    sourceTree = "<group>"; };
 		F022 /* ChatBackgroundView.swift */  = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ChatBackgroundView.swift";     sourceTree = "<group>"; };
 		F023 /* SwipeBackModifier.swift */   = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/SwipeBackModifier.swift";      sourceTree = "<group>"; };
+		F024 /* AudioRecorderService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/AudioRecorderService.swift"; sourceTree = "<group>"; };
+		F025 /* VideoMessageRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/VideoMessageRecorderView.swift"; sourceTree = "<group>"; };
 		P001 /* LendicgramVK.app */        = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LendicgramVK.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -79,12 +83,13 @@
 			children = (
 				F001, F002,
 				F003,
-				F004, F005, F006, F007, F017, F019,
+				F004, F005, F006, F007, F017, F019, F024,
 				F008, F009, F010, F018,
 				F011, F012, F013, F014, F015, F020,
 				F021,
 				F022,
 				F023,
+				F025,
 				F016,
 			);
 			path = LendicgramVK;
@@ -150,12 +155,13 @@
 			files = (
 				B001, B002,
 				B003,
-				B004, B005, B006, B007, B017, B019,
+				B004, B005, B006, B007, B017, B019, B024,
 				B008, B009, B010, B018,
 				B011, B012, B013, B014, B015, B020,
 				B021,
 				B022,
 				B023,
+				B025,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
