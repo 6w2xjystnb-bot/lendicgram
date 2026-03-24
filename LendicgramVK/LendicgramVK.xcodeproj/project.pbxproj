@@ -173,8 +173,8 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Lendicgram;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Нужна для отправки фото";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Нужен для голосовых сообщений";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Нужна для отправки фото и видеосообщений";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Нужен для голосовых и видеосообщений";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -203,8 +203,8 @@
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Lendicgram;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Нужна для отправки фото";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Нужен для голосовых сообщений";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Нужна для отправки фото и видеосообщений";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Нужен для голосовых и видеосообщений";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

@@ -64,6 +64,7 @@ struct StickerKeyboardView: View {
         if let url = sticker.bestURL {
             CachedAsyncImage(url: url) { img in
                 img.resizable().scaledToFit()
+                    .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 1)
             } placeholder: {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color(.quaternarySystemFill))

@@ -167,6 +167,107 @@ final class VKAPIService {
         ])
     }
 
+    // MARK: - Audio Message Upload
+
+    private struct DocUploadServerResponse: Decodable {
+        let uploadUrl: String
+        enum CodingKeys: String, CodingKey { case uploadUrl = "upload_url" }
+    }
+
+    private struct DocUploadResult: Decodable {
+        let file: String
+    }
+
+    private struct DocSaveResponse: Decodable {
+        let type: String
+        let audioMessage: DocSavedMedia?
+        let videoMessage: DocSavedMedia?
+        let doc: DocSavedMedia?
+        enum CodingKeys: String, CodingKey {
+            case type
+            case audioMessage = "audio_message"
+            case videoMessage = "video_message"
+            case doc
+        }
+        var media: DocSavedMedia? { audioMessage ?? videoMessage ?? doc }
+    }
+
+    private struct DocSavedMedia: Decodable {
+        let id: Int
+        let ownerId: Int
+        enum CodingKeys: String, CodingKey { case id; case ownerId = "owner_id" }
+    }
+
+    /// Upload voice message: get upload URL → multipart upload → save → return attachment string
+    func uploadAudioMessage(peerId: Int, fileURL: URL) async throws -> String {
+        // 1. Get upload server for audio_message type
+        let server: DocUploadServerResponse = try await get(
+            "docs.getMessagesUploadServer", ["peer_id": "\(peerId)", "type": "audio_message"])
+
+        guard let uploadURL = URL(string: server.uploadUrl) else {
+            throw VKAPIError.invalidURL
+        }
+
+        // 2. Multipart upload
+        let fileData = try Data(contentsOf: fileURL)
+        let boundary = "VK-\(UUID().uuidString)"
+        var request = URLRequest(url: uploadURL)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        var body = Data()
+        body += "--\(boundary)\r\n".data(using: .utf8)!
+        body += "Content-Disposition: form-data; name=\"file\"; filename=\"voice.m4a\"\r\n".data(using: .utf8)!
+        body += "Content-Type: audio/mp4\r\n\r\n".data(using: .utf8)!
+        body += fileData
+        body += "\r\n--\(boundary)--\r\n".data(using: .utf8)!
+
+        let (uploadData, _) = try await URLSession.shared.upload(for: request, from: body)
+        let uploadResult = try JSONDecoder().decode(DocUploadResult.self, from: uploadData)
+
+        // 3. Save doc
+        let saved: DocSaveResponse = try await get("docs.save", ["file": uploadResult.file])
+
+        guard let am = saved.media else { throw VKAPIError.emptyResponse }
+        return "doc\(am.ownerId)_\(am.id)"
+    }
+
+    // MARK: - Video Message Upload
+
+    /// Upload video message (кружок): get upload URL → multipart upload → save → return attachment string
+    func uploadVideoMessage(peerId: Int, fileURL: URL) async throws -> String {
+        // 1. Get upload server for video_message type
+        let server: DocUploadServerResponse = try await get(
+            "docs.getMessagesUploadServer", ["peer_id": "\(peerId)", "type": "video_message"])
+
+        guard let uploadURL = URL(string: server.uploadUrl) else {
+            throw VKAPIError.invalidURL
+        }
+
+        // 2. Multipart upload
+        let fileData = try Data(contentsOf: fileURL)
+        let boundary = "VK-\(UUID().uuidString)"
+        var request = URLRequest(url: uploadURL)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        var body = Data()
+        body += "--\(boundary)\r\n".data(using: .utf8)!
+        body += "Content-Disposition: form-data; name=\"file\"; filename=\"video_message.mp4\"\r\n".data(using: .utf8)!
+        body += "Content-Type: video/mp4\r\n\r\n".data(using: .utf8)!
+        body += fileData
+        body += "\r\n--\(boundary)--\r\n".data(using: .utf8)!
+
+        let (uploadData, _) = try await URLSession.shared.upload(for: request, from: body)
+        let uploadResult = try JSONDecoder().decode(DocUploadResult.self, from: uploadData)
+
+        // 3. Save doc
+        let saved: DocSaveResponse = try await get("docs.save", ["file": uploadResult.file])
+
+        guard let media = saved.media else { throw VKAPIError.emptyResponse }
+        return "doc\(media.ownerId)_\(media.id)"
+    }
+
     // MARK: - Stickers
 
     func sendSticker(peerId: Int, stickerId: Int) async throws -> Int {

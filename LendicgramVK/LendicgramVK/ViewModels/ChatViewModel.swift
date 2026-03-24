@@ -162,6 +162,30 @@ final class ChatViewModel: ObservableObject {
         isSending = false
     }
 
+    // MARK: - Voice Message
+
+    func sendVoice(fileURL: URL) async {
+        isSending = true
+        do {
+            let attachment = try await api.uploadAudioMessage(peerId: peerId, fileURL: fileURL)
+            _ = try await api.sendWithAttachment(peerId: peerId, text: "", attachment: attachment)
+            await fetchLatest()
+        } catch { self.error = error.localizedDescription }
+        isSending = false
+    }
+
+    // MARK: - Video Message (кружок)
+
+    func sendVideoMessage(fileURL: URL) async {
+        isSending = true
+        do {
+            let attachment = try await api.uploadVideoMessage(peerId: peerId, fileURL: fileURL)
+            _ = try await api.sendWithAttachment(peerId: peerId, text: "", attachment: attachment)
+            await fetchLatest()
+        } catch { self.error = error.localizedDescription }
+        isSending = false
+    }
+
     // MARK: - Stickers
 
     @Published var stickerPacks: [VKStickerProduct] = []

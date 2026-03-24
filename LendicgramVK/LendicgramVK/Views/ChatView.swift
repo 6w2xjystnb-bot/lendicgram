@@ -15,9 +15,11 @@ struct ChatView: View {
 
     @StateObject private var vm: ChatViewModel
     @StateObject private var audioPlayer = AudioPlayerService.shared
+    @StateObject private var recorder = AudioRecorderService.shared
     @State private var input         = ""
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var showStickers  = false
+    @State private var showVideoRecorder = false
 
     init(peerId: Int, peerName: String) {
         self.peerId   = peerId
@@ -52,6 +54,14 @@ struct ChatView: View {
         .task { await vm.load() }
         .onChange(of: pickerItems) { _, items in
             Task { await handlePickedItems(items) }
+        }
+        .fullScreenCover(isPresented: $showVideoRecorder) {
+            VideoMessageRecorderView { fileURL in
+                showVideoRecorder = false
+                Task { await vm.sendVideoMessage(fileURL: fileURL) }
+            } onCancel: {
+                showVideoRecorder = false
+            }
         }
     }
 
@@ -142,7 +152,25 @@ struct ChatView: View {
 
     // MARK: - Input Bar
 
+    private var hasText: Bool {
+        !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     var inputBar: some View {
+        ZStack {
+            // ── Recording overlay ────────────────────────────────────
+            if recorder.isRecording {
+                recordingBar
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            } else {
+                normalInputBar
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: recorder.isRecording)
+    }
+
+    var normalInputBar: some View {
         HStack(alignment: .bottom, spacing: 10) {
 
             // ── Bubble 1: paperclip ──────────────────────────────────
@@ -171,7 +199,7 @@ struct ChatView: View {
                         Task { await vm.loadStickers() }
                     }
                 } label: {
-                    Image(systemName: showStickers ? "keyboard" : (input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "face.smiling" : "face.smiling"))
+                    Image(systemName: showStickers ? "keyboard" : "face.smiling")
                         .font(.system(size: 20))
                         .foregroundStyle(showStickers ? tgAccent : Color(.secondaryLabel))
                         .padding(.bottom, 10)
@@ -181,34 +209,109 @@ struct ChatView: View {
             .glassEffect(.regular.interactive(), in: .capsule)
             .frame(maxWidth: .infinity)
 
-            // ── Bubble 3: mic / send ─────────────────────────────────
-            Button(action: {
-                Task { await vm.send(text: input); input = "" }
-            }) {
-                Group {
-                    if vm.isSending {
-                        ProgressView().tint(.white)
-                    } else {
-                        Image(systemName: input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                              ? "mic" : "arrow.up")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                             ? Color(.secondaryLabel) : .white)
+            // ── Bubble 3: mic / video / send ─────────────────────────
+            if hasText {
+                // Send text
+                Button {
+                    Task { await vm.send(text: input); input = "" }
+                } label: {
+                    Group {
+                        if vm.isSending {
+                            ProgressView().tint(.white)
+                        } else {
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(.white)
+                        }
                     }
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(tgAccent))
                 }
-                .frame(width: 44, height: 44)
-                .background {
-                    if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Circle().fill(.clear).glassEffect(.regular.interactive(), in: .circle)
-                    } else {
-                        Circle().fill(tgAccent)
-                    }
+                .disabled(vm.isSending)
+            } else {
+                // Voice record button (tap to start)
+                Button {
+                    recorder.start()
+                } label: {
+                    Image(systemName: "mic")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(Color(.secondaryLabel))
+                        .frame(width: 44, height: 44)
+                        .glassEffect(.regular.interactive(), in: .circle)
+                }
+
+                // Video message button
+                Button {
+                    showVideoRecorder = true
+                } label: {
+                    Image(systemName: "video.circle")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(Color(.secondaryLabel))
+                        .frame(width: 44, height: 44)
+                        .glassEffect(.regular.interactive(), in: .circle)
                 }
             }
-            .disabled(vm.isSending || input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
+    }
+
+    // MARK: - Recording Bar
+
+    var recordingBar: some View {
+        HStack(spacing: 14) {
+            // Cancel
+            Button {
+                recorder.cancel()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.red)
+            }
+
+            // Waveform + duration
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(.red)
+                    .frame(width: 10, height: 10)
+                    .opacity(recorder.isRecording ? 1 : 0.3)
+                    .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: recorder.isRecording)
+
+                Text(formatRecordingDuration(recorder.duration))
+                    .font(.system(size: 17, weight: .medium).monospacedDigit())
+                    .foregroundStyle(Color(.label))
+
+                // Live mini waveform
+                RecordingWaveformView(samples: recorder.waveformSamples)
+                    .frame(height: 24)
+                    .frame(maxWidth: .infinity)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .glassEffect(.regular.interactive(), in: .capsule)
+            .frame(maxWidth: .infinity)
+
+            // Send
+            Button {
+                if let result = recorder.stop() {
+                    Task { await vm.sendVoice(fileURL: result.url) }
+                }
+            } label: {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(tgAccent))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+    }
+
+    private func formatRecordingDuration(_ d: TimeInterval) -> String {
+        let m = Int(d) / 60
+        let s = Int(d) % 60
+        return String(format: "%d:%02d", m, s)
     }
 
     // MARK: - Toolbar
@@ -593,54 +696,14 @@ struct BubbleView: View {
         }
     }
 
-    // Video message (circle / кружок)
+    // Video message (circle / кружок) — with inline playback
     @ViewBuilder
     func videoMessageView(_ vmsg: VKVideoMessage?) -> some View {
-        ZStack {
-            if let url = vmsg?.previewURL {
-                CachedAsyncImage(url: url) { img in
-                    img.resizable().scaledToFill()
-                        .frame(width: 200, height: 200)
-                        .clipShape(Circle())
-                } placeholder: {
-                    Circle()
-                        .fill(Color(.tertiarySystemBackground))
-                        .frame(width: 200, height: 200)
-                        .overlay(ProgressView().tint(tgAccent))
-                }
-            } else {
-                Circle()
-                    .fill(Color(.tertiarySystemBackground))
-                    .frame(width: 200, height: 200)
-                    .overlay(
-                        Image(systemName: "video.circle")
-                            .font(.system(size: 44))
-                            .foregroundStyle(Color(.secondaryLabel))
-                    )
-            }
-            // Frosted play overlay
-            Circle()
-                .fill(Color.black.opacity(0.25))
-                .frame(width: 200, height: 200)
-                .overlay(
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 36))
-                        .foregroundStyle(.white.opacity(0.85))
-                )
-        }
-        .overlay(alignment: .bottomTrailing) {
-            HStack(spacing: 3) {
-                if let d = vmsg?.duration {
-                    Text(formatDuration(d))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.white)
-                }
-                timeAndCheck
-            }
-            .padding(.horizontal, 8).padding(.vertical, 4)
-            .background(Capsule().fill(Color.black.opacity(0.5)))
-            .padding(8)
-        }
+        InlineVideoMessageView(
+            videoMessage: vmsg,
+            timeAndCheck: timeAndCheck,
+            formatDuration: formatDuration
+        )
     }
 
     // Document
@@ -801,13 +864,14 @@ struct BubbleView: View {
         }
     }
 
-    // Sticker — transparent, no bubble background
+    // Sticker — transparent, no bubble background, shadow for contrast
     @ViewBuilder
     func stickerView(_ sticker: VKSticker) -> some View {
         if let url = sticker.bestURL {
             CachedAsyncImage(url: url) { img in
                 img.resizable().scaledToFit()
                     .frame(width: 160, height: 160)
+                    .shadow(color: .black.opacity(0.12), radius: 4, x: 0, y: 2)
                     .allowsHitTesting(false)
             } placeholder: {
                 Color.clear.frame(width: 160, height: 160)
@@ -910,6 +974,178 @@ struct TypingDots: View {
             }
         }
         .onAppear { phase = 0 }
+    }
+}
+
+// MARK: - Inline Video Message Player
+
+struct InlineVideoMessageView: View {
+    let videoMessage: VKVideoMessage?
+    let timeAndCheck: AnyView
+    let formatDuration: (Int) -> String
+
+    @State private var isPlaying = false
+    @State private var player: AVPlayer?
+    @State private var progress: Double = 0
+    @State private var observer: Any?
+
+    init(videoMessage: VKVideoMessage?,
+         timeAndCheck: some View,
+         formatDuration: @escaping (Int) -> String) {
+        self.videoMessage = videoMessage
+        self.timeAndCheck = AnyView(timeAndCheck)
+        self.formatDuration = formatDuration
+    }
+
+    var body: some View {
+        ZStack {
+            if isPlaying, let player = player {
+                VideoPlayerCircleView(player: player)
+                    .frame(width: 200, height: 200)
+                    .clipShape(Circle())
+                    .onTapGesture { stopPlayback() }
+            } else {
+                // Preview thumbnail
+                if let url = videoMessage?.previewURL {
+                    CachedAsyncImage(url: url) { img in
+                        img.resizable().scaledToFill()
+                            .frame(width: 200, height: 200)
+                            .clipShape(Circle())
+                    } placeholder: {
+                        Circle()
+                            .fill(Color(.tertiarySystemBackground))
+                            .frame(width: 200, height: 200)
+                            .overlay(ProgressView().tint(tgAccent))
+                    }
+                } else {
+                    Circle()
+                        .fill(Color(.tertiarySystemBackground))
+                        .frame(width: 200, height: 200)
+                        .overlay(
+                            Image(systemName: "video.circle")
+                                .font(.system(size: 44))
+                                .foregroundStyle(Color(.secondaryLabel))
+                        )
+                }
+                // Play button overlay
+                Circle()
+                    .fill(Color.black.opacity(0.25))
+                    .frame(width: 200, height: 200)
+                    .overlay(
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 36))
+                            .foregroundStyle(.white.opacity(0.85))
+                    )
+                    .onTapGesture { startPlayback() }
+            }
+
+            // Progress ring
+            if isPlaying {
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(tgAccent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .frame(width: 200, height: 200)
+                    .rotationEffect(.degrees(-90))
+                    .animation(.linear(duration: 0.1), value: progress)
+            }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            HStack(spacing: 3) {
+                if let d = videoMessage?.duration {
+                    Text(formatDuration(d))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white)
+                }
+                timeAndCheck
+            }
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(Capsule().fill(Color.black.opacity(0.5)))
+            .padding(8)
+        }
+        .onDisappear { stopPlayback() }
+    }
+
+    private func startPlayback() {
+        guard let link = videoMessage?.link, let url = URL(string: link) else { return }
+        let avPlayer = AVPlayer(url: url)
+        self.player = avPlayer
+        isPlaying = true
+        avPlayer.play()
+
+        observer = avPlayer.addPeriodicTimeObserver(
+            forInterval: CMTime(seconds: 0.05, preferredTimescale: 600),
+            queue: .main
+        ) { time in
+            guard let dur = avPlayer.currentItem?.duration.seconds,
+                  dur > 0, !dur.isNaN else { return }
+            progress = time.seconds / dur
+            if time.seconds >= dur - 0.1 { stopPlayback() }
+        }
+    }
+
+    private func stopPlayback() {
+        if let obs = observer { player?.removeTimeObserver(obs); observer = nil }
+        player?.pause()
+        player = nil
+        isPlaying = false
+        progress = 0
+    }
+}
+
+// MARK: - Video Player Circle (UIViewRepresentable)
+
+struct VideoPlayerCircleView: UIViewRepresentable {
+    let player: AVPlayer
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        let playerLayer = AVPlayerLayer(player: player)
+        playerLayer.videoGravity = .resizeAspectFill
+        view.layer.addSublayer(playerLayer)
+        context.coordinator.playerLayer = playerLayer
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.playerLayer?.frame = uiView.bounds
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    class Coordinator {
+        var playerLayer: AVPlayerLayer?
+    }
+}
+
+// MARK: - Recording Waveform (live)
+
+struct RecordingWaveformView: View {
+    let samples: [Float]
+
+    var body: some View {
+        GeometryReader { g in
+            let barCount = max(1, Int(g.size.width / 4))
+            let displaySamples = recentSamples(count: barCount)
+            HStack(spacing: 1.5) {
+                ForEach(Array(displaySamples.enumerated()), id: \.offset) { _, h in
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(tgAccent)
+                        .frame(width: 2.5, height: max(2, h * g.size.height))
+                }
+            }
+            .frame(height: g.size.height, alignment: .center)
+        }
+    }
+
+    private func recentSamples(count: Int) -> [CGFloat] {
+        guard !samples.isEmpty else { return Array(repeating: 0.08, count: count) }
+        // Take the last `count` samples
+        let recent = samples.suffix(count)
+        let maxAbs: Float = 60  // dB range
+        return recent.map { sample in
+            let normalized = (sample + maxAbs) / maxAbs
+            return CGFloat(max(0.08, min(1.0, normalized)))
+        }
     }
 }
 
