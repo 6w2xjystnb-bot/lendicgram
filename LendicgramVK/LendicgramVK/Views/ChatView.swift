@@ -17,6 +17,7 @@ struct ChatView: View {
     @StateObject private var audioPlayer = AudioPlayerService.shared
     @State private var input         = ""
     @State private var pickerItems: [PhotosPickerItem] = []
+    @State private var showStickers  = false
     @Environment(\.dismiss) private var dismiss
 
     init(peerId: Int, peerName: String) {
@@ -28,12 +29,19 @@ struct ChatView: View {
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             // Subtle wallpaper
-            TGWallpaper().ignoresSafeArea()
+            ChatBackgroundView().ignoresSafeArea()
 
             VStack(spacing: 0) {
                 messageList
                 if !vm.typingUserIds.isEmpty { typingBar }
                 inputBar
+                if showStickers {
+                    StickerKeyboardView(packs: vm.stickerPacks) { stickerId in
+                        showStickers = false
+                        Task { await vm.sendSticker(stickerId: stickerId) }
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -161,10 +169,14 @@ struct ChatView: View {
                     .padding(.vertical, 10)
 
                 Button {
+                    withAnimation(.easeInOut(duration: 0.25)) { showStickers.toggle() }
+                    if showStickers && vm.stickerPacks.isEmpty {
+                        Task { await vm.loadStickers() }
+                    }
                 } label: {
-                    Image(systemName: input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "clock" : "face.smiling")
+                    Image(systemName: showStickers ? "keyboard" : (input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "face.smiling" : "face.smiling"))
                         .font(.system(size: 20))
-                        .foregroundStyle(Color(.secondaryLabel))
+                        .foregroundStyle(showStickers ? tgAccent : Color(.secondaryLabel))
                         .padding(.bottom, 10)
                 }
             }
