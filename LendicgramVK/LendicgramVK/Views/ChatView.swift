@@ -47,7 +47,8 @@ struct ChatView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar { chatToolbar }
-        .toolbar(.hidden, for: .tabBar)
+        .toolbarVisibility(.hidden, for: .tabBar)
+        .enableSwipeBack()
         .tint(tgAccent)
         .alert("Ошибка", isPresented: .constant(vm.error != nil)) {
             Button("OK") { vm.error = nil }
