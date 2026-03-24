@@ -59,6 +59,9 @@ struct ChatsListView: View {
         .animation(.easeInOut(duration: 0.25), value: path.isEmpty)
         .tint(tgAccent)
         .task { await vm.load() }
+        .onChange(of: path.isEmpty) { _, isEmpty in
+            if isEmpty { Task { await vm.refresh() } }
+        }
     }
 
     // MARK: - Filter chips

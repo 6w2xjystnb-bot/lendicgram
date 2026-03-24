@@ -103,17 +103,17 @@ struct VKConversationsByIdResponse: Decodable {
 
 struct VKConversationItem: Decodable, Identifiable {
     var id: Int { conversation.peer.id }
-    let conversation: VKConversation
-    let lastMessage: VKAPIMessage?
+    var conversation: VKConversation
+    var lastMessage: VKAPIMessage?
     enum CodingKeys: String, CodingKey { case conversation; case lastMessage = "last_message" }
 }
 
 struct VKConversation: Decodable {
     let peer: VKPeer
     let inRead: Int?
-    let outRead: Int?
+    var outRead: Int?
     let lastMessageId: Int?
-    let unreadCount: Int?
+    var unreadCount: Int?
     let isPinned: Bool?
     let isMarkedUnread: Bool?
     let canSendMessage: Bool?

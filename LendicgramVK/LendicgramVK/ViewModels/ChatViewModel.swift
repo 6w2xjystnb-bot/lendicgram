@@ -36,12 +36,25 @@ final class ChatViewModel: ObservableObject {
             }
             .store(in: &bag)
 
-        // New message
+        // New message — instant feedback + background data refresh
         longPoll.newMessageSubject
             .filter { [peerId] in $0.peerId == peerId }
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.fetchTrigger.send()
+            .sink { [weak self] msg in
+                guard let self = self else { return }
+                // Instant: append message immediately for real-time feel
+                if !self.messages.contains(where: { $0.id == msg.id }) {
+                    self.messages.append(msg)
+                }
+                // Clear typing indicator for sender
+                self.typingUserIds.remove(msg.fromId)
+                self.typingTimers[msg.fromId]?.cancel()
+                // Mark incoming as read
+                if !msg.isOutgoing {
+                    Task { await self.markAsRead() }
+                }
+                // Fetch full data (attachments, profiles) in background
+                self.fetchTrigger.send()
             }
             .store(in: &bag)
 

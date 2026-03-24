@@ -46,8 +46,26 @@ final class ChatsViewModel: ObservableObject {
 
         longPoll.readInSubject
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.fetchTrigger.send()
+            .sink { [weak self] event in
+                guard let self = self else { return }
+                // Optimistic: clear unread for this peer
+                if let idx = self.items.firstIndex(where: { $0.conversation.peer.id == event.peerId }) {
+                    self.items[idx].conversation.unreadCount = 0
+                }
+                self.fetchTrigger.send()
+            }
+            .store(in: &bag)
+
+        longPoll.readSubject
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] event in
+                guard let self = self else { return }
+                // Optimistic: update outRead so delivery checkmarks change instantly
+                if let idx = self.items.firstIndex(where: { $0.conversation.peer.id == event.peerId }) {
+                    let newRead = max(self.items[idx].conversation.outRead ?? 0, event.msgId)
+                    self.items[idx].conversation.outRead = newRead
+                }
+                self.fetchTrigger.send()
             }
             .store(in: &bag)
     }
@@ -81,7 +99,16 @@ final class ChatsViewModel: ObservableObject {
         // Clear typing for this peer
         typingPeers.removeValue(forKey: msg.peerId)
         typingTimers[msg.peerId]?.cancel()
-        // Debounced refresh
+        // Optimistic: update last message & move conversation to top instantly
+        if let idx = items.firstIndex(where: { $0.conversation.peer.id == msg.peerId }) {
+            var item = items.remove(at: idx)
+            item.lastMessage = msg
+            if !msg.isOutgoing {
+                item.conversation.unreadCount = (item.conversation.unreadCount ?? 0) + 1
+            }
+            items.insert(item, at: 0)
+        }
+        // Full API refresh (debounced) to reconcile
         fetchTrigger.send()
     }
 
