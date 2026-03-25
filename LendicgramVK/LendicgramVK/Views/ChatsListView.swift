@@ -1,7 +1,7 @@
 import SwiftUI
 
 // Telegram-inspired blue accent used across all screens
-let tgAccent = Color(red: 0.522, green: 0.694, blue: 0.557) // #85B18E Whitegram green
+let tgAccent = Color(red: 0.00, green: 0.66, blue: 0.52) // #00a884 Whitegram green
 
 struct ChatDestination: Hashable {
     let peerId: Int

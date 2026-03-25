@@ -12,8 +12,8 @@ struct ChatBackgroundView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                // Base color — #7D7463 Whitegram background
-                Color(red: 0.490, green: 0.455, blue: 0.388)
+                // Base color — very dark (matches Whitegram dark theme)
+                Color(red: 0.04, green: 0.08, blue: 0.10) // #0B141A
 
                 // Soft blobs (same as original TGWallpaper)
                 Canvas { ctx, size in
@@ -36,7 +36,7 @@ struct ChatBackgroundView: View {
                 ForEach(items) { item in
                     Text(item.text)
                         .font(.system(size: item.size, weight: .regular, design: .serif))
-                        .foregroundStyle(Color(.label).opacity(item.opacity))
+                        .foregroundStyle(Color(red: 0.10, green: 0.18, blue: 0.15).opacity(item.opacity * 5))
                         .rotationEffect(.degrees(item.rotation))
                         .position(x: geo.size.width * item.rx,
                                   y: geo.size.height * item.ry)

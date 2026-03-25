@@ -2,12 +2,12 @@ import SwiftUI
 import AVFoundation
 import PhotosUI
 
-// MARK: - Whitegram Theme Colors (from Whitegram color picker)
+// MARK: - Whitegram Dark Theme Colors (matched to Whitegram screenshots)
 
-private let waOutgoing   = Color(red: 0.40, green: 0.498, blue: 0.431) // #667F6E
-private let waIncoming   = Color(red: 0.255, green: 0.357, blue: 0.251) // #415B40
-private let waGreen      = Color(red: 0.522, green: 0.694, blue: 0.557) // #85B18E
-private let waCheckRead  = Color(red: 0.522, green: 0.694, blue: 0.557) // #85B18E (matches accent)
+private let waOutgoing   = Color(red: 0.00, green: 0.36, blue: 0.29)   // #005c4b dark green
+private let waIncoming   = Color(red: 0.13, green: 0.17, blue: 0.20)   // #202C33 dark gray
+private let waGreen      = Color(red: 0.00, green: 0.66, blue: 0.52)   // #00a884 green accent
+private let waCheckRead  = Color(red: 0.33, green: 0.74, blue: 0.92)   // #53bdeb blue checks
 private let waGray       = Color(red: 0.53, green: 0.59, blue: 0.63)   // #8696a0
 private let waInputField = Color(red: 0.16, green: 0.22, blue: 0.26)   // #2a3942
 private let waHeaderBg   = Color(red: 0.12, green: 0.17, blue: 0.21)   // #1f2c34
