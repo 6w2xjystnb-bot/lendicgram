@@ -645,13 +645,14 @@ struct BubbleView: View {
     func photoView(_ photo: VKPhoto?) -> some View {
         if let url = photo?.bestURL {
             let ratio = photo?.aspectRatio ?? 1.0
-            let w: CGFloat = 240
-            let h: CGFloat = min(300, max(80, w / ratio))
             CachedAsyncImage(url: url) { img in
                 img.resizable().scaledToFill()
-                    .frame(maxWidth: w, maxHeight: h)
+                    .frame(minWidth: 120, maxWidth: 260)
+                    .aspectRatio(ratio, contentMode: .fit)
                     .clipped()
             } placeholder: {
+                let w: CGFloat = 240
+                let h: CGFloat = min(300, max(80, w / ratio))
                 Rectangle()
                     .fill(waIncoming)
                     .frame(width: w, height: h)
