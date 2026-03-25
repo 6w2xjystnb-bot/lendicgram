@@ -21,6 +21,7 @@ struct ChatView: View {
     @StateObject private var vm: ChatViewModel
     @StateObject private var audioPlayer = AudioPlayerService.shared
     @StateObject private var recorder = AudioRecorderService.shared
+    @Environment(\.dismiss) private var dismiss
     @State private var input         = ""
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var showStickers  = false
@@ -51,9 +52,9 @@ struct ChatView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .toolbar { chatToolbar }
-        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .tint(.white)
         .alert("Ошибка", isPresented: .constant(vm.error != nil)) {
             Button("OK") { vm.error = nil }
@@ -189,7 +190,7 @@ struct ChatView: View {
 
     var normalInputBar: some View {
         HStack(alignment: .bottom, spacing: 10) {
-            // Paperclip — circle outline like Whitegram
+            // Paperclip — individual glass circle
             PhotosPicker(selection: $pickerItems,
                          maxSelectionCount: 10,
                          matching: .any(of: [.images, .videos])) {
@@ -197,10 +198,13 @@ struct ChatView: View {
                     .font(.system(size: 20, weight: .medium))
                     .foregroundStyle(waGray)
                     .frame(width: 44, height: 44)
-                    .background(Circle().stroke(waGray.opacity(0.4), lineWidth: 1.5))
+                    .background {
+                        Circle().fill(.clear)
+                            .glassEffect(.regular.interactive(), in: .circle)
+                    }
             }
 
-            // Text field + emoji button
+            // Text field + emoji button — individual glass capsule
             HStack(alignment: .bottom, spacing: 4) {
                 TextField("Сообщение", text: $input, axis: .vertical)
                     .lineLimit(1...6)
@@ -229,7 +233,7 @@ struct ChatView: View {
                     .glassEffect(.regular.interactive(), in: .capsule)
             }
 
-            // Send / Mic — circle outline like Whitegram
+            // Send / Mic — individual glass circle
             if hasText {
                 Button {
                     Task { await vm.send(text: input); input = "" }
@@ -255,34 +259,36 @@ struct ChatView: View {
                         .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(waGray)
                         .frame(width: 44, height: 44)
-                        .background(Circle().stroke(waGray.opacity(0.4), lineWidth: 1.5))
+                        .background {
+                            Circle().fill(.clear)
+                                .glassEffect(.regular.interactive(), in: .circle)
+                        }
                 }
             }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 8)
-        .background {
-            Rectangle()
-                .fill(.clear)
-                .glassEffect(.regular.interactive(), in: .rect)
-                .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: -2)
-        }
     }
 
     // MARK: - Recording Bar
 
     var recordingBar: some View {
         HStack(spacing: 14) {
-            // Cancel
+            // Cancel — individual glass circle
             Button {
                 recorder.cancel()
             } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 28))
+                Image(systemName: "xmark")
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.red)
+                    .frame(width: 42, height: 42)
+                    .background {
+                        Circle().fill(.clear)
+                            .glassEffect(.regular.interactive(), in: .circle)
+                    }
             }
 
-            // Waveform + duration
+            // Waveform + duration — individual glass capsule
             HStack(spacing: 10) {
                 Circle()
                     .fill(.red)
@@ -307,6 +313,7 @@ struct ChatView: View {
             }
             .frame(maxWidth: .infinity)
 
+            // Send — green circle
             Button {
                 if let result = recorder.stop() {
                     Task { await vm.sendVoice(fileURL: result.url) }
@@ -321,12 +328,6 @@ struct ChatView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 8)
-        .background {
-            Rectangle()
-                .fill(.clear)
-                .glassEffect(.regular.interactive(), in: .rect)
-                .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: -2)
-        }
     }
 
     private func formatRecordingDuration(_ d: TimeInterval) -> String {
@@ -339,6 +340,18 @@ struct ChatView: View {
 
     @ToolbarContentBuilder
     var chatToolbar: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarLeading) {
+            Button { dismiss() } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 38, height: 38)
+                    .background {
+                        Circle().fill(.clear)
+                            .glassEffect(.regular.interactive(), in: .circle)
+                    }
+            }
+        }
         ToolbarItem(placement: .principal) {
             VStack(spacing: 1) {
                 Text(peerName)
@@ -359,9 +372,19 @@ struct ChatView: View {
                 }
                 .font(.system(size: 13))
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .background {
+                Capsule().fill(.clear)
+                    .glassEffect(.regular.interactive(), in: .capsule)
+            }
         }
         ToolbarItem(placement: .navigationBarTrailing) {
             VKAvatarView(url: vm.peerUser?.avatarURL, name: peerName, size: 34)
+                .background {
+                    Circle().fill(.clear)
+                        .glassEffect(.regular.interactive(), in: .circle)
+                }
         }
     }
 
