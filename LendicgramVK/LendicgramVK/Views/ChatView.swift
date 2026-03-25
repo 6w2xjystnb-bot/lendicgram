@@ -80,18 +80,7 @@ struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 2) {
-                    if vm.hasMore {
-                        Button { Task { await vm.loadMore() } } label: {
-                            if vm.isLoading {
-                                ProgressView().tint(waGreen).padding()
-                            } else {
-                                Text("Загрузить ранее")
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(waGreen)
-                                    .padding(10)
-                            }
-                        }
-                    } else if vm.isLoading {
+                    if vm.isLoading && vm.hasMore {
                         ProgressView().tint(waGreen).padding()
                     }
 
@@ -111,6 +100,10 @@ struct ChatView: View {
                                 audioPlayer: audioPlayer
                             )
                             .id(msg.id)
+                        }
+                        if index == 0 && vm.hasMore {
+                            Color.clear.frame(height: 1)
+                                .onAppear { Task { await vm.loadMore() } }
                         }
                     }
                 }
