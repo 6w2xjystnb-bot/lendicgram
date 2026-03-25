@@ -478,6 +478,8 @@ struct BubbleView: View {
                 }
             } else if att.type == "video_message" {
                 videoMessageView(att.videoMessage)
+            } else if att.type == "video", att.video?.isVideoMessage == true {
+                videoAsCircleView(att.video)
             } else if att.type == "photo" {
                 ZStack(alignment: .bottomTrailing) {
                     photoView(att.photo)
@@ -498,12 +500,14 @@ struct BubbleView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14))
             }
         } else {
-            let hasMedia = msg.attachments?.contains(where: { $0.type == "photo" || $0.type == "video" }) ?? false
+            let hasMedia = msg.attachments?.contains(where: {
+                ($0.type == "photo") || ($0.type == "video" && $0.video?.isVideoMessage != true)
+            }) ?? false
             VStack(alignment: .leading, spacing: 0) {
                 // Media attachments edge-to-edge at top
                 if let atts = msg.attachments, !atts.isEmpty {
                     ForEach(Array(atts.enumerated()), id: \.offset) { _, att in
-                        if att.type == "photo" || att.type == "video" {
+                        if att.type == "photo" || (att.type == "video" && att.video?.isVideoMessage != true) {
                             attachmentView(att)
                         }
                     }
@@ -518,7 +522,9 @@ struct BubbleView: View {
                     }
                     if let atts = msg.attachments, !atts.isEmpty {
                         ForEach(Array(atts.enumerated()), id: \.offset) { _, att in
-                            if att.type != "photo" && att.type != "video" {
+                            if att.type == "video" && att.video?.isVideoMessage == true {
+                                videoAsCircleView(att.video)
+                            } else if att.type != "photo" && att.type != "video" {
                                 attachmentView(att)
                             }
                         }
@@ -778,6 +784,16 @@ struct BubbleView: View {
         )
     }
 
+    // Video that is actually a video message (circle/кружок)
+    @ViewBuilder
+    func videoAsCircleView(_ video: VKVideo?) -> some View {
+        InlineVideoCircleFromVideo(
+            video: video,
+            timeAndCheck: timeAndCheck,
+            formatDuration: formatDuration
+        )
+    }
+
     // Document
     func docView(_ doc: VKDoc?) -> some View {
         HStack(spacing: 10) {
@@ -1026,6 +1042,122 @@ struct WaveformView: View {
             let val = idx < waveform.count ? CGFloat(waveform[idx]) / maxVal : 0.1
             return max(0.08, val)
         }
+    }
+}
+
+// MARK: - Video-as-Circle (video_message that comes as type:"video")
+
+struct InlineVideoCircleFromVideo: View {
+    let video: VKVideo?
+    let timeAndCheck: AnyView
+    let formatDuration: (Int) -> String
+
+    @State private var resolvedURL: URL?
+    @State private var isPlaying = false
+    @State private var player: AVPlayer?
+    @State private var progress: Double = 0
+    @State private var observer: Any?
+
+    init(video: VKVideo?,
+         timeAndCheck: some View, formatDuration: @escaping (Int) -> String) {
+        self.video = video
+        self.timeAndCheck = AnyView(timeAndCheck)
+        self.formatDuration = formatDuration
+    }
+
+    var body: some View {
+        ZStack {
+            if isPlaying, let player = player {
+                VideoPlayerCircleView(player: player)
+                    .frame(width: 200, height: 200)
+                    .clipShape(Circle())
+                    .onTapGesture { stopPlayback() }
+            } else {
+                if let url = video?.thumbURL {
+                    CachedAsyncImage(url: url) { img in
+                        img.resizable().scaledToFill()
+                            .frame(width: 200, height: 200)
+                            .clipShape(Circle())
+                    } placeholder: {
+                        Circle().fill(waIncoming).frame(width: 200, height: 200)
+                            .overlay(ProgressView().tint(waGreen))
+                    }
+                } else {
+                    Circle().fill(waIncoming).frame(width: 200, height: 200)
+                        .overlay(
+                            Image(systemName: "video.circle")
+                                .font(.system(size: 44)).foregroundStyle(waGray)
+                        )
+                }
+                Circle()
+                    .fill(Color.black.opacity(0.25))
+                    .frame(width: 200, height: 200)
+                    .overlay(
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 36))
+                            .foregroundStyle(.white.opacity(0.85))
+                    )
+                    .onTapGesture { startPlayback() }
+            }
+            if isPlaying {
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(Color(red: 0.56, green: 0.56, blue: 0.58),
+                            style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .frame(width: 200, height: 200)
+                    .rotationEffect(.degrees(-90))
+                    .animation(.linear(duration: 0.1), value: progress)
+            }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            HStack(spacing: 3) {
+                if let d = video?.duration {
+                    Text(formatDuration(d))
+                        .font(.system(size: 11)).foregroundStyle(.white)
+                }
+                timeAndCheck
+            }
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(Capsule().fill(Color.black.opacity(0.5)))
+            .padding(8)
+        }
+        .onDisappear { stopPlayback() }
+    }
+
+    private func startPlayback() {
+        if let url = resolvedURL {
+            play(url)
+            return
+        }
+        guard let vid = video?.id, let oid = video?.ownerId else { return }
+        Task {
+            if let full = try? await VKAPIService.shared.getVideo(ownerId: oid, videoId: vid, accessKey: video?.accessKey),
+               let url = full.bestFileURL {
+                resolvedURL = url
+                play(url)
+            }
+        }
+    }
+
+    private func play(_ url: URL) {
+        let avPlayer = AVPlayer(url: url)
+        self.player = avPlayer
+        isPlaying = true
+        avPlayer.play()
+        observer = avPlayer.addPeriodicTimeObserver(
+            forInterval: CMTime(seconds: 0.05, preferredTimescale: 600), queue: .main
+        ) { time in
+            guard let dur = avPlayer.currentItem?.duration.seconds,
+                  dur > 0, !dur.isNaN else { return }
+            progress = time.seconds / dur
+            if time.seconds >= dur - 0.1 { stopPlayback() }
+        }
+    }
+
+    private func stopPlayback() {
+        if let obs = observer { player?.removeTimeObserver(obs); observer = nil }
+        player?.pause(); player = nil
+        isPlaying = false; progress = 0
     }
 }
 

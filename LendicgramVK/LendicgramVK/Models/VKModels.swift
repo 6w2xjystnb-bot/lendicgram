@@ -336,9 +336,12 @@ struct VKVideo: Decodable {
     let title: String?
     let duration: Int?
     let player: String?
+    let videoType: String?
     let files: VKVideoFiles?
     let image: [VKVideoImage]?
     let firstFrame: [VKVideoImage]?
+    /// True when this video is actually a video message (circle/кружок)
+    var isVideoMessage: Bool { videoType == "video_message" }
     var thumbURL: URL? {
         let imgs = image ?? firstFrame ?? []
         return imgs.max(by: { ($0.width ?? 0) < ($1.width ?? 0) })
@@ -356,8 +359,8 @@ struct VKVideo: Decodable {
     }
     enum CodingKeys: String, CodingKey {
         case id; case ownerId = "owner_id"; case accessKey = "access_key"
-        case title; case duration; case player; case files
-        case image; case firstFrame = "first_frame"
+        case title; case duration; case player; case videoType = "type"
+        case files; case image; case firstFrame = "first_frame"
     }
 }
 
