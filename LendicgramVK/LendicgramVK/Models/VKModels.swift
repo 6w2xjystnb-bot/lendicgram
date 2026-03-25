@@ -332,6 +332,7 @@ struct VKPhotoSize: Decodable {
 struct VKVideo: Decodable {
     let id: Int?
     let ownerId: Int?
+    let accessKey: String?
     let title: String?
     let duration: Int?
     let player: String?
@@ -354,7 +355,8 @@ struct VKVideo: Decodable {
         return candidates.compactMap { $0 }.compactMap { URL(string: $0) }.first
     }
     enum CodingKeys: String, CodingKey {
-        case id; case ownerId = "owner_id"; case title; case duration; case player; case files
+        case id; case ownerId = "owner_id"; case accessKey = "access_key"
+        case title; case duration; case player; case files
         case image; case firstFrame = "first_frame"
     }
 }

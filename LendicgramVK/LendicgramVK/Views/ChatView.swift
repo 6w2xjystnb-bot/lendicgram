@@ -1,7 +1,6 @@
 import SwiftUI
 import AVFoundation
 import PhotosUI
-import WebKit
 
 extension URL: @retroactive Identifiable {
     public var id: String { absoluteString }
@@ -424,7 +423,6 @@ struct BubbleView: View {
 
     @State private var selectedPhotoURL: URL?
     @State private var selectedVideoURL: URL?
-    @State private var selectedPlayerURL: URL?
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 0) {
@@ -449,9 +447,6 @@ struct BubbleView: View {
         }
         .fullScreenCover(item: $selectedVideoURL) { url in
             VideoPlayerView(videoURL: url)
-        }
-        .fullScreenCover(item: $selectedPlayerURL) { url in
-            VideoWebPlayerView(playerURL: url)
         }
     }
 
@@ -718,12 +713,9 @@ struct BubbleView: View {
             .onTapGesture {
                 guard let vid = video?.id, let oid = video?.ownerId else { return }
                 Task {
-                    if let full = try? await VKAPIService.shared.getVideo(ownerId: oid, videoId: vid) {
-                        if let url = full.bestFileURL {
-                            selectedVideoURL = url
-                        } else if let p = full.player, let url = URL(string: p) {
-                            selectedPlayerURL = url
-                        }
+                    if let full = try? await VKAPIService.shared.getVideo(ownerId: oid, videoId: vid, accessKey: video?.accessKey),
+                       let url = full.bestFileURL {
+                        selectedVideoURL = url
                     }
                 }
             }
@@ -1271,41 +1263,3 @@ struct WADoubleCheck: View {
 
 // BubbleTailShape removed — bubbles are now simple rounded rects
 
-// MARK: - Video Web Player (for restricted videos)
-
-struct VideoWebPlayerView: View {
-    let playerURL: URL
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        ZStack(alignment: .topLeading) {
-            VideoWebView(url: playerURL)
-                .ignoresSafeArea()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 30))
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(.white, Color.black.opacity(0.5))
-            }
-            .padding(.leading, 16)
-            .padding(.top, 54)
-        }
-        .background(Color.black)
-    }
-}
-
-struct VideoWebView: UIViewRepresentable {
-    let url: URL
-    func makeUIView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        config.allowsInlineMediaPlayback = true
-        config.mediaTypesRequiringUserActionForPlayback = []
-        let webView = WKWebView(frame: .zero, configuration: config)
-        webView.isOpaque = false
-        webView.backgroundColor = .black
-        webView.scrollView.backgroundColor = .black
-        webView.load(URLRequest(url: url))
-        return webView
-    }
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
-}

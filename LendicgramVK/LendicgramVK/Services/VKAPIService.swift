@@ -289,9 +289,11 @@ final class VKAPIService {
 
     // MARK: - Video
 
-    func getVideo(ownerId: Int, videoId: Int) async throws -> VKVideo? {
+    func getVideo(ownerId: Int, videoId: Int, accessKey: String? = nil) async throws -> VKVideo? {
+        var videoStr = "\(ownerId)_\(videoId)"
+        if let key = accessKey { videoStr += "_\(key)" }
         let resp: VKVideoListResponse = try await get("video.get", [
-            "videos": "\(ownerId)_\(videoId)",
+            "videos": videoStr,
         ])
         return resp.items.first
     }
