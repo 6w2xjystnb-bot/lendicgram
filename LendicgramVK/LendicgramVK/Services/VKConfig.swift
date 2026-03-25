@@ -11,7 +11,7 @@ enum VKConfig {
             .init(name: "client_id",     value: appId),
             .init(name: "display",       value: "mobile"),
             .init(name: "redirect_uri",  value: "https://oauth.vk.com/blank.html"),
-            .init(name: "scope",         value: "messages,friends,photos,offline"),
+            .init(name: "scope",         value: "messages,friends,photos,video,docs,offline"),
             .init(name: "response_type", value: "token"),
             .init(name: "v",             value: apiVersion),
         ]
