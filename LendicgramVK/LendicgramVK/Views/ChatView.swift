@@ -29,8 +29,6 @@ struct ChatView: View {
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var showStickers  = false
     @State private var showVideoRecorder = false
-    @State private var selectedPhotoURL: URL?
-    @State private var selectedVideoURL: URL?
 
     init(peerId: Int, peerName: String) {
         self.peerId   = peerId
@@ -73,12 +71,6 @@ struct ChatView: View {
             } onCancel: {
                 showVideoRecorder = false
             }
-        }
-        .fullScreenCover(item: $selectedPhotoURL) { url in
-            PhotoViewerView(url: url)
-        }
-        .fullScreenCover(item: $selectedVideoURL) { url in
-            VideoPlayerView(playerURL: url)
         }
     }
 
@@ -429,6 +421,9 @@ struct BubbleView: View {
     var showTail:    Bool = true
     let audioPlayer: AudioPlayerService
 
+    @State private var selectedPhotoURL: URL?
+    @State private var selectedVideoURL: URL?
+
     var body: some View {
         HStack(alignment: .bottom, spacing: 0) {
             if msg.isOutgoing { Spacer(minLength: 60) }
@@ -447,6 +442,12 @@ struct BubbleView: View {
             if !msg.isOutgoing { Spacer(minLength: 60) }
         }
         .padding(.vertical, 1)
+        .fullScreenCover(item: $selectedPhotoURL) { url in
+            PhotoViewerView(url: url)
+        }
+        .fullScreenCover(item: $selectedVideoURL) { url in
+            VideoPlayerView(playerURL: url)
+        }
     }
 
     // MARK: - Bubble content

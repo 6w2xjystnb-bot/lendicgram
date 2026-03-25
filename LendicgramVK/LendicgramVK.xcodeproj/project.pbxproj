@@ -32,6 +32,7 @@
 		B023 /* SwipeBackModifier.swift in Sources */   = {isa = PBXBuildFile; fileRef = F023; };
 		B024 /* AudioRecorderService.swift in Sources */  = {isa = PBXBuildFile; fileRef = F024; };
 		B025 /* VideoMessageRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F025; };
+		B026 /* MediaViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F026; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -60,6 +61,7 @@
 		F023 /* SwipeBackModifier.swift */   = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/SwipeBackModifier.swift";      sourceTree = "<group>"; };
 		F024 /* AudioRecorderService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/AudioRecorderService.swift"; sourceTree = "<group>"; };
 		F025 /* VideoMessageRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/VideoMessageRecorderView.swift"; sourceTree = "<group>"; };
+		F026 /* MediaViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/MediaViewerView.swift"; sourceTree = "<group>"; };
 		P001 /* LendicgramVK.app */        = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LendicgramVK.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -90,6 +92,7 @@
 				F022,
 				F023,
 				F025,
+				F026,
 				F016,
 			);
 			path = LendicgramVK;
@@ -162,6 +165,7 @@
 				B022,
 				B023,
 				B025,
+				B026,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
