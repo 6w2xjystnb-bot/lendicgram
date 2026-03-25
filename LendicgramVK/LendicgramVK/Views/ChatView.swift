@@ -5,7 +5,7 @@ import PhotosUI
 // MARK: - WhatsApp Dark Theme Colors
 
 private let waOutgoing   = Color(red: 0.00, green: 0.36, blue: 0.29)   // #005c4b
-private let waIncoming   = Color(red: 0.13, green: 0.17, blue: 0.20)   // #202c33
+private let waIncoming   = Color(red: 0.10, green: 0.22, blue: 0.16)   // #1a3829 dark green
 private let waGreen      = Color(red: 0.00, green: 0.66, blue: 0.52)   // #00a884
 private let waCheckRead  = Color(red: 0.33, green: 0.74, blue: 0.92)   // #53bdeb
 private let waGray       = Color(red: 0.53, green: 0.59, blue: 0.63)   // #8696a0
@@ -52,8 +52,8 @@ struct ChatView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { chatToolbar }
-        .toolbarBackground(waHeaderBg, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .tint(.white)
         .alert("Ошибка", isPresented: .constant(vm.error != nil)) {
             Button("OK") { vm.error = nil }
@@ -112,7 +112,7 @@ struct ChatView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 4).padding(.vertical, 8)
+                .padding(.horizontal, 8).padding(.vertical, 8)
             }
             .onChange(of: vm.messages.count) { _, _ in
                 if let last = vm.messages.last {
@@ -188,15 +188,16 @@ struct ChatView: View {
     }
 
     var normalInputBar: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            // Paperclip
+        HStack(alignment: .bottom, spacing: 10) {
+            // Paperclip — circle outline like Whitegram
             PhotosPicker(selection: $pickerItems,
                          maxSelectionCount: 10,
                          matching: .any(of: [.images, .videos])) {
                 Image(systemName: "paperclip")
-                    .font(.system(size: 22))
+                    .font(.system(size: 20, weight: .medium))
                     .foregroundStyle(waGray)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().stroke(waGray.opacity(0.4), lineWidth: 1.5))
             }
 
             // Text field + emoji button
@@ -207,7 +208,7 @@ struct ChatView: View {
                     .foregroundStyle(.white)
                     .submitLabel(.return)
                     .padding(.vertical, 10)
-                    .padding(.leading, 12)
+                    .padding(.leading, 14)
 
                 Button {
                     withAnimation(.easeInOut(duration: 0.25)) { showStickers.toggle() }
@@ -219,12 +220,16 @@ struct ChatView: View {
                         .font(.system(size: 22))
                         .foregroundStyle(showStickers ? waGreen : waGray)
                         .padding(.bottom, 9)
-                        .padding(.trailing, 10)
+                        .padding(.trailing, 12)
                 }
             }
-            .background(waInputField, in: RoundedRectangle(cornerRadius: 21))
+            .background {
+                RoundedRectangle(cornerRadius: 22)
+                    .fill(.clear)
+                    .glassEffect(.regular.interactive(), in: .capsule)
+            }
 
-            // Send / Mic
+            // Send / Mic — circle outline like Whitegram
             if hasText {
                 Button {
                     Task { await vm.send(text: input); input = "" }
@@ -233,12 +238,12 @@ struct ChatView: View {
                         if vm.isSending {
                             ProgressView().tint(.white)
                         } else {
-                            Image(systemName: "mic.fill")
-                                .font(.system(size: 18, weight: .semibold))
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 20, weight: .semibold))
                                 .foregroundStyle(.white)
                         }
                     }
-                    .frame(width: 42, height: 42)
+                    .frame(width: 44, height: 44)
                     .background(Circle().fill(waGreen))
                 }
                 .disabled(vm.isSending)
@@ -247,15 +252,21 @@ struct ChatView: View {
                     recorder.start()
                 } label: {
                     Image(systemName: "mic")
-                        .font(.system(size: 22))
+                        .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(waGray)
-                        .frame(width: 42, height: 42)
+                        .frame(width: 44, height: 44)
+                        .background(Circle().stroke(waGray.opacity(0.4), lineWidth: 1.5))
                 }
             }
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 6)
-        .background(waHeaderBg)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+        .background {
+            Rectangle()
+                .fill(.clear)
+                .glassEffect(.regular.interactive(), in: .rect)
+                .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: -2)
+        }
     }
 
     // MARK: - Recording Bar
@@ -289,7 +300,11 @@ struct ChatView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(waInputField, in: Capsule())
+            .background {
+                Capsule()
+                    .fill(.clear)
+                    .glassEffect(.regular.interactive(), in: .capsule)
+            }
             .frame(maxWidth: .infinity)
 
             Button {
@@ -304,9 +319,14 @@ struct ChatView: View {
                     .background(Circle().fill(waGreen))
             }
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 6)
-        .background(waHeaderBg)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+        .background {
+            Rectangle()
+                .fill(.clear)
+                .glassEffect(.regular.interactive(), in: .rect)
+                .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: -2)
+        }
     }
 
     private func formatRecordingDuration(_ d: TimeInterval) -> String {
@@ -442,9 +462,12 @@ struct BubbleView: View {
     var bubble: some View {
         if isPureMedia, let att = msg.attachments?.first {
             if att.type == "sticker" {
-                VStack(alignment: msg.isOutgoing ? .trailing : .leading, spacing: 2) {
+                ZStack(alignment: .bottomTrailing) {
                     stickerView(att.sticker!)
-                    timeAndCheck.padding(.horizontal, 4)
+                    timeAndCheck
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(Capsule().fill(Color.black.opacity(0.45)))
+                        .padding(4)
                 }
             } else if att.type == "video_message" {
                 videoMessageView(att.videoMessage)
@@ -489,15 +512,15 @@ struct BubbleView: View {
                     HStack(spacing: 0) { Spacer(minLength: 0); metaInfo }
                 }
             }
-            .padding(.horizontal, 10).padding(.vertical, 7)
+            .padding(.horizontal, 12).padding(.vertical, 8)
             .background {
                 ZStack(alignment: msg.isOutgoing ? .topTrailing : .topLeading) {
-                    RoundedRectangle(cornerRadius: 8).fill(bubbleColor)
+                    RoundedRectangle(cornerRadius: 16).fill(bubbleColor)
                     if showTail {
                         BubbleTailShape(isOutgoing: msg.isOutgoing)
                             .fill(bubbleColor)
-                            .frame(width: 10, height: 16)
-                            .offset(x: msg.isOutgoing ? 7 : -7)
+                            .frame(width: 12, height: 18)
+                            .offset(x: msg.isOutgoing ? 8 : -8, y: 0)
                     }
                 }
             }
@@ -513,7 +536,7 @@ struct BubbleView: View {
     }
 
     private var bubbleShape: some Shape {
-        RoundedRectangle(cornerRadius: 8)
+        RoundedRectangle(cornerRadius: 16)
     }
 
     // MARK: - Meta
@@ -680,14 +703,14 @@ struct BubbleView: View {
         let url     = audio?.linkMp3 ?? audio?.linkOgg ?? ""
         let playing = audioPlayer.currentURL == url && audioPlayer.isPlaying
 
-        return HStack(spacing: 10) {
+        return HStack(spacing: 12) {
             Button { audioPlayer.toggle(url: url) } label: {
                 ZStack {
                     Circle()
                         .fill(waGreen)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 52, height: 52)
                     Image(systemName: playing ? "pause.fill" : "play.fill")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.system(size: 22, weight: .bold))
                         .foregroundStyle(.white)
                         .offset(x: playing ? 0 : 2)
                 }
@@ -696,10 +719,10 @@ struct BubbleView: View {
                 WaveformView(
                     waveform: audio?.waveform ?? [],
                     progress: audioPlayer.currentURL == url ? audioPlayer.progress : 0,
-                    tint:     .white.opacity(0.8)
+                    tint:     .white.opacity(0.7)
                 )
-                .frame(height: 26)
-                .frame(maxWidth: 160)
+                .frame(height: 28)
+                .frame(maxWidth: .infinity)
                 HStack(spacing: 4) {
                     Text(formatDuration(audio?.duration ?? 0))
                         .font(.system(size: 11))
@@ -1200,11 +1223,11 @@ struct WADoubleCheck: View {
     let isRead: Bool
 
     var body: some View {
-        HStack(spacing: -3) {
+        HStack(spacing: -4) {
             Image(systemName: "checkmark")
             Image(systemName: "checkmark")
         }
-        .font(.system(size: 10, weight: .bold))
+        .font(.system(size: 12, weight: .bold))
         .foregroundStyle(isRead ? waCheckRead : .white.opacity(0.55))
     }
 }
