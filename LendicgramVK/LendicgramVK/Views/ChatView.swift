@@ -100,6 +100,14 @@ struct ChatView: View {
                                 audioPlayer: audioPlayer
                             )
                             .id(msg.id)
+                            .transition(
+                                .asymmetric(
+                                    insertion: .scale(scale: 0.8, anchor: msg.isOutgoing ? .bottomTrailing : .bottomLeading)
+                                        .combined(with: .opacity)
+                                        .combined(with: .offset(y: 20)),
+                                    removal: .opacity
+                                )
+                            )
                         }
                         if index == 0 && vm.hasMore {
                             Color.clear.frame(height: 1)
@@ -109,6 +117,7 @@ struct ChatView: View {
                 }
                 .padding(.horizontal, 8).padding(.vertical, 8)
             }
+            .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 VStack(spacing: 0) {
@@ -116,19 +125,16 @@ struct ChatView: View {
                     inputBar
                 }
             }
-            .onChange(of: vm.messages.count) { _, _ in
-                if let last = vm.messages.last {
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        proxy.scrollTo(last.id, anchor: .bottom)
-                    }
+            .onChange(of: vm.lastMessageId) { _, newId in
+                guard let newId else { return }
+                withAnimation(.spring(duration: 0.35, bounce: 0.2)) {
+                    proxy.scrollTo(newId, anchor: .bottom)
                 }
             }
-            .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    if let last = vm.messages.last {
-                        proxy.scrollTo(last.id, anchor: .bottom)
-                    }
-                }
+            .onChange(of: vm.scrollAnchorId) { _, anchorId in
+                guard let anchorId else { return }
+                proxy.scrollTo(anchorId, anchor: .top)
+                vm.scrollAnchorId = nil
             }
         }
     }

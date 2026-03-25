@@ -9,10 +9,12 @@ final class VKAPIService {
     // MARK: - Conversations
 
     func getConversations(count: Int = 100, offset: Int = 0) async throws -> VKConversationsResponse {
-        try await get("messages.getConversations", [
+        let (result, data): (VKConversationsResponse, Data) = try await getRaw("messages.getConversations", [
             "count": "\(count)", "offset": "\(offset)",
             "extended": "1", "fields": "photo_100,photo_50,online,online_mobile,last_seen,sex",
         ])
+        if offset == 0 { ChatCache.shared.saveConversationsData(data) }
+        return result
     }
 
     func getConversationsById(peerIds: [Int]) async throws -> VKConversationsByIdResponse {
@@ -25,10 +27,12 @@ final class VKAPIService {
     // MARK: - Messages
 
     func getHistory(peerId: Int, count: Int = 50, offset: Int = 0) async throws -> VKMessagesResponse {
-        try await get("messages.getHistory", [
+        let (result, data): (VKMessagesResponse, Data) = try await getRaw("messages.getHistory", [
             "peer_id": "\(peerId)", "count": "\(count)", "offset": "\(offset)",
             "extended": "1", "fields": "photo_100,online,online_mobile,last_seen,sex",
         ])
+        if offset == 0 { ChatCache.shared.saveMessagesData(data, peerId: peerId) }
+        return result
     }
 
     func getById(messageIds: [Int]) async throws -> VKMessagesResponse {
@@ -307,6 +311,11 @@ final class VKAPIService {
     // MARK: - Generic
 
     func get<T: Decodable>(_ method: String, _ params: [String: String]) async throws -> T {
+        let (result, _): (T, Data) = try await getRaw(method, params)
+        return result
+    }
+
+    func getRaw<T: Decodable>(_ method: String, _ params: [String: String]) async throws -> (T, Data) {
         var c = URLComponents(string: "\(VKConfig.baseURL)/\(method)")!
         c.queryItems = params.map { URLQueryItem(name: $0.key, value: $0.value) }
             + [URLQueryItem(name: "access_token", value: token),
@@ -319,6 +328,7 @@ final class VKAPIService {
         if let err = try? JSONDecoder().decode(VKErrorResponse.self, from: data) {
             throw VKAPIError.apiError(code: err.error.errorCode, msg: err.error.errorMsg)
         }
-        return try JSONDecoder().decode(VKResponse<T>.self, from: data).response
+        let result = try JSONDecoder().decode(VKResponse<T>.self, from: data).response
+        return (result, data)
     }
 }

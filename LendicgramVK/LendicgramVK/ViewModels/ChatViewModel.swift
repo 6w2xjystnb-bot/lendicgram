@@ -17,6 +17,8 @@ final class ChatViewModel: ObservableObject {
     @Published var peerUser: VKUser?          // for 1-on-1 chats
     @Published var hasMore = true
     @Published var totalCount = 0
+    @Published var lastMessageId: Int?
+    @Published var scrollAnchorId: Int?
 
     private let api      = VKAPIService.shared
     private let longPoll = VKLongPollService.shared
@@ -37,7 +39,10 @@ final class ChatViewModel: ObservableObject {
                 Task { @MainActor [weak self] in
                     guard let self = self, msg.peerId == self.peerId else { return }
                     if !self.messages.contains(where: { $0.id == msg.id }) {
-                        self.messages.append(msg)
+                        withAnimation(.spring(duration: 0.35, bounce: 0.2)) {
+                            self.messages.append(msg)
+                            self.lastMessageId = msg.id
+                        }
                     }
                     self.typingUserIds.remove(msg.fromId)
                     self.typingTimers[msg.fromId]?.cancel()
@@ -80,12 +85,20 @@ final class ChatViewModel: ObservableObject {
     // MARK: - Load
 
     func load() async {
-        isLoading = true
+        // Try loading from cache first
+        if let cached = ChatCache.shared.loadMessages(peerId: peerId) {
+            messages = cached.messages
+            totalCount = cached.totalCount
+            hasMore = messages.count < totalCount
+            lastMessageId = messages.last?.id
+        }
+        isLoading = messages.isEmpty
         do {
             let r = try await api.getHistory(peerId: peerId)
             messages   = r.items.reversed()
             totalCount = r.count
             hasMore    = messages.count < totalCount
+            lastMessageId = messages.last?.id
             r.profiles?.forEach { profiles[$0.id] = $0 }
             r.groups?.forEach   { groups[-$0.id]  = $0 }
         } catch { self.error = error.localizedDescription }
@@ -134,7 +147,10 @@ final class ChatViewModel: ObservableObject {
                 }
             }
             if !newMsgs.isEmpty {
-                messages.append(contentsOf: newMsgs)
+                withAnimation(.spring(duration: 0.35, bounce: 0.2)) {
+                    messages.append(contentsOf: newMsgs)
+                    lastMessageId = newMsgs.last?.id
+                }
                 r.profiles?.forEach { profiles[$0.id] = $0 }
                 r.groups?.forEach   { groups[-$0.id]  = $0 }
             }
@@ -160,12 +176,14 @@ final class ChatViewModel: ObservableObject {
     func loadMore() async {
         guard !isLoading, hasMore else { return }
         isLoading = true
+        let anchorId = messages.first?.id
         do {
             let r = try await api.getHistory(peerId: peerId, offset: messages.count)
             let older = r.items.reversed()
             messages = older + messages
             totalCount = r.count
             hasMore = messages.count < totalCount
+            scrollAnchorId = anchorId
             r.profiles?.forEach { profiles[$0.id] = $0 }
             r.groups?.forEach   { groups[-$0.id]  = $0 }
         } catch {}
@@ -187,7 +205,10 @@ final class ChatViewModel: ObservableObject {
                 attachments: nil, replyMessage: nil, fwdMessages: nil,
                 action: nil, updateTime: nil, important: nil
             )
-            messages.append(optMsg)
+            withAnimation(.spring(duration: 0.35, bounce: 0.2)) {
+                messages.append(optMsg)
+                lastMessageId = optMsg.id
+            }
         } catch { self.error = error.localizedDescription }
         isSending = false
     }

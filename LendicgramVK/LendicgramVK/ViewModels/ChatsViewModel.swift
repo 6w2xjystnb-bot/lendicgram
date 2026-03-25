@@ -71,7 +71,13 @@ final class ChatsViewModel: ObservableObject {
     }
 
     func load() async {
-        isLoading = true
+        // Show cached data instantly
+        if let cached = ChatCache.shared.loadConversations() {
+            items = cached.items
+            cached.profiles.forEach { profiles[$0.id] = $0 }
+            cached.groups.forEach { groups[-$0.id] = $0 }
+        }
+        isLoading = items.isEmpty
         await fetch()
         isLoading = false
         Task { await longPoll.start() }
