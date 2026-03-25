@@ -198,7 +198,10 @@ struct ChatView: View {
                     .font(.system(size: 20, weight: .medium))
                     .foregroundStyle(waGray)
                     .frame(width: 44, height: 44)
-                    .glassEffect(.regular, in: .circle)
+                    .background {
+                        Circle().fill(.clear)
+                            .glassEffect(.regular.interactive(), in: .circle)
+                    }
             }
 
             // Text field + emoji button — individual glass capsule
@@ -224,9 +227,12 @@ struct ChatView: View {
                         .padding(.trailing, 12)
                 }
             }
-            .glassEffect(.regular, in: .capsule)
+            .background {
+                Capsule().fill(.clear)
+                    .glassEffect(.regular.interactive(), in: .capsule)
+            }
 
-            // Send / Mic — individual glass circle
+            // Send / Mic — individual element
             if hasText {
                 Button {
                     Task { await vm.send(text: input); input = "" }
@@ -252,7 +258,10 @@ struct ChatView: View {
                         .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(waGray)
                         .frame(width: 44, height: 44)
-                        .glassEffect(.regular, in: .circle)
+                        .background {
+                            Circle().fill(.clear)
+                                .glassEffect(.regular.interactive(), in: .circle)
+                        }
                 }
             }
         }
@@ -272,7 +281,10 @@ struct ChatView: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.red)
                     .frame(width: 42, height: 42)
-                    .glassEffect(.regular, in: .circle)
+                    .background {
+                        Circle().fill(.clear)
+                            .glassEffect(.regular.interactive(), in: .circle)
+                    }
             }
 
             // Waveform + duration — individual glass capsule
@@ -293,7 +305,10 @@ struct ChatView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .glassEffect(.regular, in: .capsule)
+            .background {
+                Capsule().fill(.clear)
+                    .glassEffect(.regular.interactive(), in: .capsule)
+            }
             .frame(maxWidth: .infinity)
 
             // Send — green circle
@@ -345,7 +360,10 @@ struct ChatView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 6)
-            .glassEffect(.regular, in: .capsule)
+            .background {
+                Capsule().fill(.clear)
+                    .glassEffect(.regular.interactive(), in: .capsule)
+            }
         }
         ToolbarItem(placement: .navigationBarTrailing) {
             VKAvatarView(url: vm.peerUser?.avatarURL, name: peerName, size: 34)
