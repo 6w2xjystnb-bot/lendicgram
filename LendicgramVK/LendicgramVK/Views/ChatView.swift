@@ -33,14 +33,12 @@ struct ChatView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
+        ZStack {
             // Subtle wallpaper
             ChatBackgroundView().ignoresSafeArea()
 
             VStack(spacing: 0) {
                 messageList
-                if !vm.typingUserIds.isEmpty { typingBar }
-                inputBar
                 if showStickers {
                     StickerKeyboardView(packs: vm.stickerPacks) { stickerId in
                         showStickers = false
@@ -115,6 +113,12 @@ struct ChatView: View {
                 .padding(.horizontal, 8).padding(.vertical, 8)
             }
             .scrollDismissesKeyboard(.interactively)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(spacing: 0) {
+                    if !vm.typingUserIds.isEmpty { typingBar }
+                    inputBar
+                }
+            }
             .onChange(of: vm.messages.count) { _, _ in
                 if let last = vm.messages.last {
                     withAnimation(.easeOut(duration: 0.2)) {
