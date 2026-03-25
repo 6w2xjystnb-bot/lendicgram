@@ -382,6 +382,17 @@ struct VKVideoListResponse: Decodable {
     let items: [VKVideo]
 }
 
+struct VKVideoSaveResponse: Decodable {
+    let uploadUrl: String?
+    let videoId: Int?
+    let ownerId: Int?
+    enum CodingKeys: String, CodingKey {
+        case uploadUrl = "upload_url"
+        case videoId = "video_id"
+        case ownerId = "owner_id"
+    }
+}
+
 struct VKAudio: Decodable {
     let id: Int?
     let ownerId: Int?

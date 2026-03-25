@@ -236,11 +236,14 @@ final class VKAPIService {
 
     /// Upload video message (кружок): get upload URL → multipart upload → save → return attachment string
     func uploadVideoMessage(peerId: Int, fileURL: URL) async throws -> String {
-        // 1. Get upload server for video_message type
-        let server: DocUploadServerResponse = try await get(
-            "docs.getMessagesUploadServer", ["peer_id": "\(peerId)", "type": "video_message"])
+        // 1. Get upload URL via video.save with is_private=1 for video messages
+        let saveResult: VKVideoSaveResponse = try await get("video.save", [
+            "is_private": "1",
+            "wallpost": "0",
+        ])
 
-        guard let uploadURL = URL(string: server.uploadUrl) else {
+        guard let uploadURLStr = saveResult.uploadUrl,
+              let uploadURL = URL(string: uploadURLStr) else {
             throw VKAPIError.invalidURL
         }
 
@@ -253,19 +256,18 @@ final class VKAPIService {
 
         var body = Data()
         body += "--\(boundary)\r\n".data(using: .utf8)!
-        body += "Content-Disposition: form-data; name=\"file\"; filename=\"video_message.mp4\"\r\n".data(using: .utf8)!
+        body += "Content-Disposition: form-data; name=\"video_file\"; filename=\"video_message.mp4\"\r\n".data(using: .utf8)!
         body += "Content-Type: video/mp4\r\n\r\n".data(using: .utf8)!
         body += fileData
         body += "\r\n--\(boundary)--\r\n".data(using: .utf8)!
 
-        let (uploadData, _) = try await URLSession.shared.upload(for: request, from: body)
-        let uploadResult = try JSONDecoder().decode(DocUploadResult.self, from: uploadData)
+        let (_, _) = try await URLSession.shared.upload(for: request, from: body)
 
-        // 3. Save doc
-        let saved: DocSaveResponse = try await get("docs.save", ["file": uploadResult.file])
-
-        guard let media = saved.media else { throw VKAPIError.emptyResponse }
-        return "doc\(media.ownerId)_\(media.id)"
+        // 3. Return video attachment string
+        guard let ownerId = saveResult.ownerId, let videoId = saveResult.videoId else {
+            throw VKAPIError.emptyResponse
+        }
+        return "video\(ownerId)_\(videoId)"
     }
 
     // MARK: - Stickers
