@@ -247,6 +247,15 @@ struct ChatView: View {
                 .disabled(vm.isSending)
             } else {
                 Button {
+                    showVideoRecorder = true
+                } label: {
+                    Image(systemName: "video.circle")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(waGray)
+                        .frame(width: 44, height: 44)
+                        .glassEffect(.regular.interactive(), in: .circle)
+                }
+                Button {
                     recorder.start()
                 } label: {
                     Image(systemName: "mic")
@@ -1129,7 +1138,7 @@ struct InlineVideoMessageView: View {
     }
 
     private func startPlayback() {
-        guard let link = videoMessage?.link, let url = URL(string: link) else { return }
+        guard let link = videoMessage?.videoURL, let url = URL(string: link) else { return }
         let avPlayer = AVPlayer(url: url)
         self.player = avPlayer
         isPlaying = true

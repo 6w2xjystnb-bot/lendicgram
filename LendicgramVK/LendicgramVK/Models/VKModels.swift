@@ -546,15 +546,18 @@ struct VKVideoMessage: Decodable {
     let ownerId: Int?
     let duration: Int?
     let preview: [VKVideoMessagePreview]?
+    let url: String?
     let link: String?
     let accessKey: String?
     var previewURL: URL? {
         preview?.max(by: { ($0.width ?? 0) < ($1.width ?? 0) })
             .flatMap { URL(string: $0.src) }
     }
+    /// VK returns the direct mp4 link as either "url" or "link"
+    var videoURL: String? { url ?? link }
     enum CodingKeys: String, CodingKey {
         case id; case ownerId = "owner_id"; case duration
-        case preview; case link; case accessKey = "access_key"
+        case preview; case url; case link; case accessKey = "access_key"
     }
 }
 struct VKVideoMessagePreview: Decodable {
