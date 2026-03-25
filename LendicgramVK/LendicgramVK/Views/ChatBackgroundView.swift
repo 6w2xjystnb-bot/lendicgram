@@ -12,8 +12,8 @@ struct ChatBackgroundView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                // Base color
-                Color(.systemGroupedBackground)
+                // Base color — #7D7463 Whitegram background
+                Color(red: 0.490, green: 0.455, blue: 0.388)
 
                 // Soft blobs (same as original TGWallpaper)
                 Canvas { ctx, size in

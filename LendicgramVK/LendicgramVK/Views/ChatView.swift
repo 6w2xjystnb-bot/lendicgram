@@ -2,12 +2,12 @@ import SwiftUI
 import AVFoundation
 import PhotosUI
 
-// MARK: - WhatsApp Dark Theme Colors
+// MARK: - Whitegram Theme Colors (from Whitegram color picker)
 
-private let waOutgoing   = Color(red: 0.00, green: 0.36, blue: 0.29)   // #005c4b
-private let waIncoming   = Color(red: 0.10, green: 0.22, blue: 0.16)   // #1a3829 dark green
-private let waGreen      = Color(red: 0.00, green: 0.66, blue: 0.52)   // #00a884
-private let waCheckRead  = Color(red: 0.33, green: 0.74, blue: 0.92)   // #53bdeb
+private let waOutgoing   = Color(red: 0.40, green: 0.498, blue: 0.431) // #667F6E
+private let waIncoming   = Color(red: 0.255, green: 0.357, blue: 0.251) // #415B40
+private let waGreen      = Color(red: 0.522, green: 0.694, blue: 0.557) // #85B18E
+private let waCheckRead  = Color(red: 0.522, green: 0.694, blue: 0.557) // #85B18E (matches accent)
 private let waGray       = Color(red: 0.53, green: 0.59, blue: 0.63)   // #8696a0
 private let waInputField = Color(red: 0.16, green: 0.22, blue: 0.26)   // #2a3942
 private let waHeaderBg   = Color(red: 0.12, green: 0.17, blue: 0.21)   // #1f2c34
@@ -198,10 +198,7 @@ struct ChatView: View {
                     .font(.system(size: 20, weight: .medium))
                     .foregroundStyle(waGray)
                     .frame(width: 44, height: 44)
-                    .background {
-                        Circle().fill(.clear)
-                            .glassEffect(.regular.interactive(), in: .circle)
-                    }
+                    .glassEffect(.regular.interactive(), in: .circle)
             }
 
             // Text field + emoji button — individual glass capsule
@@ -227,10 +224,7 @@ struct ChatView: View {
                         .padding(.trailing, 12)
                 }
             }
-            .background {
-                Capsule().fill(.clear)
-                    .glassEffect(.regular.interactive(), in: .capsule)
-            }
+            .glassEffect(.regular.interactive(), in: .capsule)
 
             // Send / Mic — individual element
             if hasText {
@@ -258,10 +252,7 @@ struct ChatView: View {
                         .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(waGray)
                         .frame(width: 44, height: 44)
-                        .background {
-                            Circle().fill(.clear)
-                                .glassEffect(.regular.interactive(), in: .circle)
-                        }
+                        .glassEffect(.regular.interactive(), in: .circle)
                 }
             }
         }
@@ -281,10 +272,7 @@ struct ChatView: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.red)
                     .frame(width: 42, height: 42)
-                    .background {
-                        Circle().fill(.clear)
-                            .glassEffect(.regular.interactive(), in: .circle)
-                    }
+                    .glassEffect(.regular.interactive(), in: .circle)
             }
 
             // Waveform + duration — individual glass capsule
@@ -305,10 +293,7 @@ struct ChatView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background {
-                Capsule().fill(.clear)
-                    .glassEffect(.regular.interactive(), in: .capsule)
-            }
+            .glassEffect(.regular.interactive(), in: .capsule)
             .frame(maxWidth: .infinity)
 
             // Send — green circle
@@ -360,13 +345,11 @@ struct ChatView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 6)
-            .background {
-                Capsule().fill(.clear)
-                    .glassEffect(.regular.interactive(), in: .capsule)
-            }
+            .glassEffect(.regular.interactive(), in: .capsule)
         }
         ToolbarItem(placement: .navigationBarTrailing) {
             VKAvatarView(url: vm.peerUser?.avatarURL, name: peerName, size: 34)
+                .glassEffect(.regular.interactive(), in: .circle)
         }
     }
 
