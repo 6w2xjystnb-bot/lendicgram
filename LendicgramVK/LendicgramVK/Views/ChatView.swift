@@ -1301,23 +1301,20 @@ struct InlineVideoMessageView: View {
 struct VideoPlayerCircleView: UIViewRepresentable {
     let player: AVPlayer
 
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView()
-        let playerLayer = AVPlayerLayer(player: player)
-        playerLayer.videoGravity = .resizeAspectFill
-        view.layer.addSublayer(playerLayer)
-        context.coordinator.playerLayer = playerLayer
+    func makeUIView(context: Context) -> PlayerContainerView {
+        let view = PlayerContainerView()
+        view.playerLayer.player = player
+        view.playerLayer.videoGravity = .resizeAspectFill
         return view
     }
 
-    func updateUIView(_ uiView: UIView, context: Context) {
-        context.coordinator.playerLayer?.frame = uiView.bounds
+    func updateUIView(_ uiView: PlayerContainerView, context: Context) {
+        uiView.playerLayer.player = player
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    class Coordinator {
-        var playerLayer: AVPlayerLayer?
+    class PlayerContainerView: UIView {
+        override class var layerClass: AnyClass { AVPlayerLayer.self }
+        var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
     }
 }
 
