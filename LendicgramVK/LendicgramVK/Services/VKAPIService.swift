@@ -287,6 +287,15 @@ final class VKAPIService {
         ])
     }
 
+    // MARK: - Video
+
+    func getVideo(ownerId: Int, videoId: Int) async throws -> VKVideo? {
+        let resp: VKVideoListResponse = try await get("video.get", [
+            "videos": "\(ownerId)_\(videoId)",
+        ])
+        return resp.items.first
+    }
+
     // MARK: - Long Poll
 
     func getLongPollServer() async throws -> VKLongPollServer {

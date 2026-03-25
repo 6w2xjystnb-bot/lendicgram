@@ -335,6 +335,7 @@ struct VKVideo: Decodable {
     let title: String?
     let duration: Int?
     let player: String?
+    let files: VKVideoFiles?
     let image: [VKVideoImage]?
     let firstFrame: [VKVideoImage]?
     var thumbURL: URL? {
@@ -347,14 +348,33 @@ struct VKVideo: Decodable {
         let m = d / 60; let s = d % 60
         return String(format: "%d:%02d", m, s)
     }
+    var bestFileURL: URL? {
+        guard let f = files else { return nil }
+        let candidates = [f.mp4_1080, f.mp4_720, f.mp4_480, f.mp4_360, f.mp4_240, f.hls]
+        return candidates.compactMap { $0 }.compactMap { URL(string: $0) }.first
+    }
     enum CodingKeys: String, CodingKey {
-        case id; case ownerId = "owner_id"; case title; case duration; case player
+        case id; case ownerId = "owner_id"; case title; case duration; case player; case files
         case image; case firstFrame = "first_frame"
     }
 }
 
+struct VKVideoFiles: Decodable {
+    let mp4_240: String?
+    let mp4_360: String?
+    let mp4_480: String?
+    let mp4_720: String?
+    let mp4_1080: String?
+    let hls: String?
+}
+
 struct VKVideoImage: Decodable {
     let url: String; let width: Int?; let height: Int?
+}
+
+struct VKVideoListResponse: Decodable {
+    let count: Int
+    let items: [VKVideo]
 }
 
 struct VKAudio: Decodable {

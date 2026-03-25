@@ -446,7 +446,7 @@ struct BubbleView: View {
             PhotoViewerView(url: url)
         }
         .fullScreenCover(item: $selectedVideoURL) { url in
-            VideoPlayerView(playerURL: url)
+            VideoPlayerView(videoURL: url)
         }
     }
 
@@ -717,11 +717,12 @@ struct BubbleView: View {
             }
             .contentShape(Rectangle())
             .onTapGesture {
-                if let p = video?.player, let url = URL(string: p) {
-                    selectedVideoURL = url
-                } else if let vid = video?.id, let oid = video?.ownerId,
-                          let url = URL(string: "https://vk.com/video\(oid)_\(vid)") {
-                    selectedVideoURL = url
+                guard let vid = video?.id, let oid = video?.ownerId else { return }
+                Task {
+                    if let full = try? await VKAPIService.shared.getVideo(ownerId: oid, videoId: vid),
+                       let url = full.bestFileURL {
+                        selectedVideoURL = url
+                    }
                 }
             }
             if let title = video?.title, !title.isEmpty {

@@ -1,5 +1,5 @@
 import SwiftUI
-import WebKit
+import AVKit
 
 // MARK: - Photo Viewer (pinch-to-zoom, swipe to dismiss)
 
@@ -28,9 +28,7 @@ struct PhotoViewerView: View {
                                 lastScale = max(1, lastScale * v)
                                 scale = lastScale
                                 if lastScale == 1 {
-                                    withAnimation(.easeOut(duration: 0.2)) {
-                                        offset = .zero
-                                    }
+                                    withAnimation(.easeOut(duration: 0.2)) { offset = .zero }
                                     lastOffset = .zero
                                 }
                             }
@@ -39,13 +37,11 @@ struct PhotoViewerView: View {
                         DragGesture()
                             .onChanged { v in
                                 if scale > 1 {
-                                    // Pan when zoomed
                                     offset = CGSize(
                                         width: lastOffset.width + v.translation.width,
                                         height: lastOffset.height + v.translation.height
                                     )
                                 } else {
-                                    // Vertical drag to dismiss
                                     offset = CGSize(width: 0, height: v.translation.height)
                                     opacity = Double(max(0.4, 1 - abs(v.translation.height) / 400))
                                 }
@@ -58,8 +54,7 @@ struct PhotoViewerView: View {
                                         dismiss()
                                     } else {
                                         withAnimation(.easeOut(duration: 0.2)) {
-                                            offset = .zero
-                                            opacity = 1
+                                            offset = .zero; opacity = 1
                                         }
                                         lastOffset = .zero
                                     }
@@ -84,17 +79,24 @@ struct PhotoViewerView: View {
     }
 }
 
-// MARK: - Video Player (WebView-based VK player)
+// MARK: - Video Player (native AVPlayer)
 
 struct VideoPlayerView: View {
-    let playerURL: URL
+    let videoURL: URL
     @Environment(\.dismiss) private var dismiss
+    @State private var player: AVPlayer?
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             Color.black.ignoresSafeArea()
-            VKWebPlayer(url: playerURL)
-                .ignoresSafeArea()
+
+            if let player {
+                VideoPlayer(player: player)
+                    .ignoresSafeArea()
+            } else {
+                ProgressView().tint(.white)
+            }
+
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 17, weight: .semibold))
@@ -104,22 +106,15 @@ struct VideoPlayerView: View {
             }
             .padding(.top, 8).padding(.leading, 16)
         }
+        .onAppear {
+            let p = AVPlayer(url: videoURL)
+            p.play()
+            player = p
+        }
+        .onDisappear {
+            player?.pause()
+            player = nil
+        }
         .statusBarHidden()
     }
-}
-
-struct VKWebPlayer: UIViewRepresentable {
-    let url: URL
-    func makeUIView(context: Context) -> WKWebView {
-        let cfg = WKWebViewConfiguration()
-        cfg.allowsInlineMediaPlayback = true
-        cfg.mediaTypesRequiringUserActionForPlayback = []
-        let wv = WKWebView(frame: .zero, configuration: cfg)
-        wv.isOpaque = false
-        wv.backgroundColor = .black
-        wv.scrollView.backgroundColor = .black
-        wv.load(URLRequest(url: url))
-        return wv
-    }
-    func updateUIView(_ wv: WKWebView, context: Context) {}
 }
