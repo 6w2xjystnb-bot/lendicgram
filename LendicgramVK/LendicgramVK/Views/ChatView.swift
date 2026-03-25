@@ -430,7 +430,7 @@ struct BubbleView: View {
                 }
                 bubble
             }
-            .padding(msg.isOutgoing ? .trailing : .leading, showTail ? 0 : 8)
+            .padding(msg.isOutgoing ? .trailing : .leading, 4)
 
             if !msg.isOutgoing { Spacer(minLength: 60) }
         }
@@ -504,18 +504,8 @@ struct BubbleView: View {
                     HStack(spacing: 0) { Spacer(minLength: 0); metaInfo }
                 }
             }
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .background {
-                ZStack(alignment: msg.isOutgoing ? .bottomTrailing : .bottomLeading) {
-                    RoundedRectangle(cornerRadius: 18).fill(bubbleColor)
-                    if showTail {
-                        BubbleTailShape(isOutgoing: msg.isOutgoing)
-                            .fill(bubbleColor)
-                            .frame(width: 12, height: 18)
-                            .offset(x: msg.isOutgoing ? 8 : -8, y: 0)
-                    }
-                }
-            }
+            .padding(.horizontal, 14).padding(.vertical, 9)
+            .background(RoundedRectangle(cornerRadius: 20).fill(bubbleColor))
         }
     }
 

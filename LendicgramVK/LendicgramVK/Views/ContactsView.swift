@@ -34,6 +34,8 @@ struct ContactsView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(graphiteBg.ignoresSafeArea())
             .refreshable { await vm.refresh() }
             .navigationTitle("Контакты")
             .navigationBarTitleDisplayMode(.large)

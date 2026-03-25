@@ -3,6 +3,7 @@ import SwiftUI
 // Graphite accent used across all screens — dirty sketch style
 let tgAccent  = Color(red: 0.56, green: 0.56, blue: 0.58) // #8e8e93 muted gray
 let tgOnline  = Color(red: 0.30, green: 0.75, blue: 0.40) // #4dbf66 online green
+let graphiteBg = Color(red: 0.09, green: 0.09, blue: 0.10) // #161618 dark graphite
 
 struct ChatDestination: Hashable {
     let peerId: Int
@@ -44,6 +45,8 @@ struct ChatsListView: View {
                     chatList
                 }
             }
+            .background(graphiteBg.ignoresSafeArea())
+            .scrollContentBackground(.hidden)
             .navigationTitle("Сообщения")
             .navigationBarTitleDisplayMode(.large)
             .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always),

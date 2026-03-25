@@ -77,6 +77,8 @@ struct ProfileView: View {
                 }
             }
             .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(graphiteBg.ignoresSafeArea())
             .navigationTitle("Настройки")
             .navigationBarTitleDisplayMode(.large)
         }
