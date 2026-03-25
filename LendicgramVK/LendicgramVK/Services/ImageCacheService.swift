@@ -31,7 +31,14 @@ final class ImageCache: @unchecked Sendable {
 
     func set(_ image: UIImage, for url: URL) {
         let key = cacheKey(url)
-        let data = image.jpegData(compressionQuality: 0.92) ?? Data()
+        let hasAlpha = image.cgImage.map {
+            let info = $0.alphaInfo
+            return info == .first || info == .last ||
+                   info == .premultipliedFirst || info == .premultipliedLast
+        } ?? false
+        let data = hasAlpha
+            ? (image.pngData() ?? Data())
+            : (image.jpegData(compressionQuality: 0.92) ?? Data())
         memory.setObject(image, forKey: key as NSString, cost: data.count)
         let path = diskPath(key)
         ioQueue.async { try? data.write(to: path, options: .atomic) }
