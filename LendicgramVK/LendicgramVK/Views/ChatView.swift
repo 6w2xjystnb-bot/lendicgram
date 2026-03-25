@@ -471,6 +471,8 @@ struct BubbleView: View {
                         .background(Capsule().fill(Color.black.opacity(0.4)))
                         .padding(6)
                 }
+                .clipShape(MessageBubbleShape(isOutgoing: msg.isOutgoing, cornerRadius: 18))
+                .padding(msg.isOutgoing ? .trailing : .leading, -8)
             } else if att.type == "video" {
                 ZStack(alignment: .bottomTrailing) {
                     videoView(att.video)
@@ -479,6 +481,8 @@ struct BubbleView: View {
                         .background(Capsule().fill(Color.black.opacity(0.4)))
                         .padding(6)
                 }
+                .clipShape(MessageBubbleShape(isOutgoing: msg.isOutgoing, cornerRadius: 18))
+                .padding(msg.isOutgoing ? .trailing : .leading, -8)
             }
         } else {
             VStack(alignment: .leading, spacing: 6) {
@@ -624,12 +628,11 @@ struct BubbleView: View {
                     .frame(maxWidth: w, maxHeight: h)
                     .clipped()
             } placeholder: {
-                RoundedRectangle(cornerRadius: 12)
+                Rectangle()
                     .fill(waIncoming)
                     .frame(width: w, height: h)
                     .overlay(ProgressView().tint(waGreen))
             }
-            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
     }
 
@@ -642,13 +645,12 @@ struct BubbleView: View {
                     img.resizable().scaledToFill()
                         .frame(width: 240, height: 160).clipped()
                 } placeholder: {
-                    RoundedRectangle(cornerRadius: 12)
+                    Rectangle()
                         .fill(waIncoming)
                         .frame(width: 240, height: 160)
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 12))
             } else {
-                RoundedRectangle(cornerRadius: 12)
+                Rectangle()
                     .fill(waIncoming)
                     .frame(width: 240, height: 160)
             }
@@ -1213,31 +1215,74 @@ struct WADoubleCheck: View {
     }
 }
 
-// MARK: - Bubble Tail Shape
+// MARK: - iMessage-style Bubble Shape (for media)
 
-struct BubbleTailShape: Shape {
+struct MessageBubbleShape: Shape {
     let isOutgoing: Bool
+    let cornerRadius: CGFloat
 
     func path(in rect: CGRect) -> Path {
+        let r = cornerRadius
+        let tailW: CGFloat = 8
+        let tailH: CGFloat = 16
+
         var p = Path()
+
         if isOutgoing {
-            // Tail pointing right-down from bottom of bubble
-            p.move(to: CGPoint(x: 0, y: 0))
-            p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            // Main body without bottom-right corner — tail goes there
+            p.move(to: CGPoint(x: rect.minX + r, y: rect.minY))
+            // top edge
+            p.addLine(to: CGPoint(x: rect.maxX - r, y: rect.minY))
+            // top-right corner
+            p.addArc(center: CGPoint(x: rect.maxX - r, y: rect.minY + r),
+                      radius: r, startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
+            // right edge down to tail start
+            p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - tailH))
+            // tail curve out and back
             p.addCurve(
-                to: CGPoint(x: 0, y: rect.maxY),
-                control1: CGPoint(x: rect.maxX * 0.4, y: rect.maxY),
-                control2: CGPoint(x: 0, y: rect.maxY)
+                to: CGPoint(x: rect.maxX + tailW, y: rect.maxY),
+                control1: CGPoint(x: rect.maxX, y: rect.maxY - tailH * 0.3),
+                control2: CGPoint(x: rect.maxX + tailW, y: rect.maxY - tailH * 0.15)
             )
-        } else {
-            // Tail pointing left-down from bottom of bubble
-            p.move(to: CGPoint(x: rect.maxX, y: 0))
-            p.addLine(to: CGPoint(x: 0, y: rect.maxY))
             p.addCurve(
-                to: CGPoint(x: rect.maxX, y: rect.maxY),
-                control1: CGPoint(x: rect.maxX * 0.6, y: rect.maxY),
+                to: CGPoint(x: rect.maxX - r * 0.6, y: rect.maxY),
+                control1: CGPoint(x: rect.maxX + tailW * 0.3, y: rect.maxY),
                 control2: CGPoint(x: rect.maxX, y: rect.maxY)
             )
+            // bottom edge
+            p.addLine(to: CGPoint(x: rect.minX + r, y: rect.maxY))
+            // bottom-left corner
+            p.addArc(center: CGPoint(x: rect.minX + r, y: rect.maxY - r),
+                      radius: r, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
+            // left edge
+            p.addLine(to: CGPoint(x: rect.minX, y: rect.minY + r))
+            // top-left corner
+            p.addArc(center: CGPoint(x: rect.minX + r, y: rect.minY + r),
+                      radius: r, startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
+        } else {
+            // Incoming — tail on the left
+            p.move(to: CGPoint(x: rect.minX + r, y: rect.minY))
+            p.addLine(to: CGPoint(x: rect.maxX - r, y: rect.minY))
+            p.addArc(center: CGPoint(x: rect.maxX - r, y: rect.minY + r),
+                      radius: r, startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
+            p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - r))
+            p.addArc(center: CGPoint(x: rect.maxX - r, y: rect.maxY - r),
+                      radius: r, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
+            p.addLine(to: CGPoint(x: rect.minX + r * 0.6, y: rect.maxY))
+            // tail curve
+            p.addCurve(
+                to: CGPoint(x: rect.minX - tailW, y: rect.maxY),
+                control1: CGPoint(x: rect.minX, y: rect.maxY),
+                control2: CGPoint(x: rect.minX - tailW * 0.3, y: rect.maxY)
+            )
+            p.addCurve(
+                to: CGPoint(x: rect.minX, y: rect.maxY - tailH),
+                control1: CGPoint(x: rect.minX - tailW, y: rect.maxY - tailH * 0.15),
+                control2: CGPoint(x: rect.minX, y: rect.maxY - tailH * 0.3)
+            )
+            p.addLine(to: CGPoint(x: rect.minX, y: rect.minY + r))
+            p.addArc(center: CGPoint(x: rect.minX + r, y: rect.minY + r),
+                      radius: r, startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
         }
         p.closeSubpath()
         return p
