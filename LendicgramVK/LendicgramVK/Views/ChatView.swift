@@ -21,7 +21,6 @@ struct ChatView: View {
     @StateObject private var vm: ChatViewModel
     @StateObject private var audioPlayer = AudioPlayerService.shared
     @StateObject private var recorder = AudioRecorderService.shared
-    @Environment(\.dismiss) private var dismiss
     @State private var input         = ""
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var showStickers  = false
@@ -52,9 +51,9 @@ struct ChatView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
         .toolbar { chatToolbar }
         .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
+        .enableSwipeBack()
         .tint(.white)
         .alert("Ошибка", isPresented: .constant(vm.error != nil)) {
             Button("OK") { vm.error = nil }
@@ -115,6 +114,7 @@ struct ChatView: View {
                 }
                 .padding(.horizontal, 8).padding(.vertical, 8)
             }
+            .scrollDismissesKeyboard(.interactively)
             .onChange(of: vm.messages.count) { _, _ in
                 if let last = vm.messages.last {
                     withAnimation(.easeOut(duration: 0.2)) {
@@ -198,10 +198,7 @@ struct ChatView: View {
                     .font(.system(size: 20, weight: .medium))
                     .foregroundStyle(waGray)
                     .frame(width: 44, height: 44)
-                    .background {
-                        Circle().fill(.clear)
-                            .glassEffect(.regular.interactive(), in: .circle)
-                    }
+                    .glassEffect(.regular, in: .circle)
             }
 
             // Text field + emoji button — individual glass capsule
@@ -227,11 +224,7 @@ struct ChatView: View {
                         .padding(.trailing, 12)
                 }
             }
-            .background {
-                RoundedRectangle(cornerRadius: 22)
-                    .fill(.clear)
-                    .glassEffect(.regular.interactive(), in: .capsule)
-            }
+            .glassEffect(.regular, in: .capsule)
 
             // Send / Mic — individual glass circle
             if hasText {
@@ -259,10 +252,7 @@ struct ChatView: View {
                         .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(waGray)
                         .frame(width: 44, height: 44)
-                        .background {
-                            Circle().fill(.clear)
-                                .glassEffect(.regular.interactive(), in: .circle)
-                        }
+                        .glassEffect(.regular, in: .circle)
                 }
             }
         }
@@ -282,10 +272,7 @@ struct ChatView: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.red)
                     .frame(width: 42, height: 42)
-                    .background {
-                        Circle().fill(.clear)
-                            .glassEffect(.regular.interactive(), in: .circle)
-                    }
+                    .glassEffect(.regular, in: .circle)
             }
 
             // Waveform + duration — individual glass capsule
@@ -306,11 +293,7 @@ struct ChatView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background {
-                Capsule()
-                    .fill(.clear)
-                    .glassEffect(.regular.interactive(), in: .capsule)
-            }
+            .glassEffect(.regular, in: .capsule)
             .frame(maxWidth: .infinity)
 
             // Send — green circle
@@ -340,18 +323,6 @@ struct ChatView: View {
 
     @ToolbarContentBuilder
     var chatToolbar: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarLeading) {
-            Button { dismiss() } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 38, height: 38)
-                    .background {
-                        Circle().fill(.clear)
-                            .glassEffect(.regular.interactive(), in: .circle)
-                    }
-            }
-        }
         ToolbarItem(placement: .principal) {
             VStack(spacing: 1) {
                 Text(peerName)
@@ -374,17 +345,10 @@ struct ChatView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 6)
-            .background {
-                Capsule().fill(.clear)
-                    .glassEffect(.regular.interactive(), in: .capsule)
-            }
+            .glassEffect(.regular, in: .capsule)
         }
         ToolbarItem(placement: .navigationBarTrailing) {
             VKAvatarView(url: vm.peerUser?.avatarURL, name: peerName, size: 34)
-                .background {
-                    Circle().fill(.clear)
-                        .glassEffect(.regular.interactive(), in: .circle)
-                }
         }
     }
 
