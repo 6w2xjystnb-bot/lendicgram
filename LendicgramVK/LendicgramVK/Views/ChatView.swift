@@ -540,7 +540,7 @@ struct BubbleView: View {
                 }
                 .padding(.horizontal, 14).padding(.vertical, 9)
             }
-            .frame(maxWidth: hasMedia ? 240 : .infinity, alignment: .leading)
+            .frame(maxWidth: hasMedia ? 240 : nil, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: hasMedia ? 14 : 20).fill(bubbleColor))
             .clipShape(RoundedRectangle(cornerRadius: hasMedia ? 14 : 20))
             .overlay {
