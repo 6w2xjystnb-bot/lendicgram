@@ -33,6 +33,7 @@
 		B024 /* AudioRecorderService.swift in Sources */  = {isa = PBXBuildFile; fileRef = F024; };
 		B025 /* VideoMessageRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F025; };
 		B026 /* MediaViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F026; };
+		B027 /* ChatCacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F027; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -62,6 +63,7 @@
 		F024 /* AudioRecorderService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/AudioRecorderService.swift"; sourceTree = "<group>"; };
 		F025 /* VideoMessageRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/VideoMessageRecorderView.swift"; sourceTree = "<group>"; };
 		F026 /* MediaViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/MediaViewerView.swift"; sourceTree = "<group>"; };
+		F027 /* ChatCacheService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Services/ChatCacheService.swift"; sourceTree = "<group>"; };
 		P001 /* LendicgramVK.app */        = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LendicgramVK.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -85,7 +87,7 @@
 			children = (
 				F001, F002,
 				F003,
-				F004, F005, F006, F007, F017, F019, F024,
+				F004, F005, F006, F007, F017, F019, F024, F027,
 				F008, F009, F010, F018,
 				F011, F012, F013, F014, F015, F020,
 				F021,
@@ -158,7 +160,7 @@
 			files = (
 				B001, B002,
 				B003,
-				B004, B005, B006, B007, B017, B019, B024,
+				B004, B005, B006, B007, B017, B019, B024, B027,
 				B008, B009, B010, B018,
 				B011, B012, B013, B014, B015, B020,
 				B021,
