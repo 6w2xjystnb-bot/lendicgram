@@ -477,29 +477,23 @@ struct BubbleView: View {
             } else if att.type == "video_message" {
                 videoMessageView(att.videoMessage)
             } else if att.type == "photo" {
-                VStack(spacing: 0) {
+                ZStack(alignment: .bottomTrailing) {
                     photoView(att.photo)
-                    HStack(spacing: 0) {
-                        Spacer(minLength: 0)
-                        timeAndCheck
-                    }
-                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    timeAndCheck
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(Capsule().fill(Color.black.opacity(0.45)))
+                        .padding(6)
                 }
-                .background(RoundedRectangle(cornerRadius: 14).fill(bubbleColor))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.08), lineWidth: 0.5))
             } else if att.type == "video" {
-                VStack(spacing: 0) {
+                ZStack(alignment: .bottomTrailing) {
                     videoView(att.video)
-                    HStack(spacing: 0) {
-                        Spacer(minLength: 0)
-                        timeAndCheck
-                    }
-                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    timeAndCheck
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(Capsule().fill(Color.black.opacity(0.45)))
+                        .padding(6)
                 }
-                .background(RoundedRectangle(cornerRadius: 14).fill(bubbleColor))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.08), lineWidth: 0.5))
             }
         } else {
             let hasMedia = msg.attachments?.contains(where: { $0.type == "photo" || $0.type == "video" }) ?? false
