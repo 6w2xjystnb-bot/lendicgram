@@ -527,6 +527,7 @@ struct BubbleView: View {
                 }
                 .padding(.horizontal, 14).padding(.vertical, 9)
             }
+            .frame(maxWidth: hasMedia ? 240 : .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: hasMedia ? 14 : 20).fill(bubbleColor))
             .clipShape(RoundedRectangle(cornerRadius: hasMedia ? 14 : 20))
             .overlay {
@@ -645,14 +646,13 @@ struct BubbleView: View {
     func photoView(_ photo: VKPhoto?) -> some View {
         if let url = photo?.bestURL {
             let ratio = photo?.aspectRatio ?? 1.0
+            let w: CGFloat = 240
+            let h: CGFloat = min(300, max(80, w / ratio))
             CachedAsyncImage(url: url) { img in
                 img.resizable().scaledToFill()
-                    .frame(minWidth: 120, maxWidth: 260)
-                    .aspectRatio(ratio, contentMode: .fit)
+                    .frame(width: w, height: h)
                     .clipped()
             } placeholder: {
-                let w: CGFloat = 240
-                let h: CGFloat = min(300, max(80, w / ratio))
                 Rectangle()
                     .fill(waIncoming)
                     .frame(width: w, height: h)
