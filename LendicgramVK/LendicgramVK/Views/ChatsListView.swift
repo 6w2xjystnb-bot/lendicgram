@@ -1,7 +1,8 @@
 import SwiftUI
 
-// Telegram-inspired blue accent used across all screens
-let tgAccent = Color(red: 0.00, green: 0.66, blue: 0.52) // #00a884 Whitegram green
+// Graphite accent used across all screens — dirty sketch style
+let tgAccent  = Color(red: 0.56, green: 0.56, blue: 0.58) // #8e8e93 muted gray
+let tgOnline  = Color(red: 0.30, green: 0.75, blue: 0.40) // #4dbf66 online green
 
 struct ChatDestination: Hashable {
     let peerId: Int
@@ -163,7 +164,7 @@ struct ChatRow: View {
                         .fill(Color(.systemBackground))
                         .frame(width: 16, height: 16)
                         .overlay(
-                            Circle().fill(tgAccent).padding(2.5)
+                            Circle().fill(tgOnline).padding(2.5)
                         )
                         .offset(x: 1, y: 1)
                 }
@@ -200,7 +201,7 @@ struct ChatRow: View {
                 HStack(alignment: .bottom) {
                     Text(preview)
                         .font(.system(size: 14))
-                        .foregroundStyle(isTyping ? tgAccent : Color(.secondaryLabel))
+                        .foregroundStyle(isTyping ? tgOnline : Color(.secondaryLabel))
                         .lineLimit(2)
                     Spacer(minLength: 4)
                     if unread > 0 {

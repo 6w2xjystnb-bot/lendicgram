@@ -58,7 +58,7 @@ struct ContactsView: View {
                         Circle()
                             .fill(Color(.systemBackground))
                             .frame(width: 14, height: 14)
-                            .overlay(Circle().fill(tgAccent).padding(2.5))
+                            .overlay(Circle().fill(tgOnline).padding(2.5))
                             .offset(x: 1, y: 1)
                     }
                 }
@@ -69,7 +69,7 @@ struct ContactsView: View {
                         .lineLimit(1)
                     Text(user.statusText)
                         .font(.system(size: 13))
-                        .foregroundStyle(user.isOnline ? tgAccent : Color(.secondaryLabel))
+                        .foregroundStyle(user.isOnline ? tgOnline : Color(.secondaryLabel))
                         .lineLimit(1)
                 }
             }

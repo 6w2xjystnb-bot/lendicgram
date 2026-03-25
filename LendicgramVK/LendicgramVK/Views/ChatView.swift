@@ -2,15 +2,15 @@ import SwiftUI
 import AVFoundation
 import PhotosUI
 
-// MARK: - Whitegram Dark Theme Colors (matched to Whitegram screenshots)
+// MARK: - Graphite Dark Theme Colors (dirty sketch style)
 
-private let waOutgoing   = Color(red: 0.00, green: 0.36, blue: 0.29)   // #005c4b dark green
-private let waIncoming   = Color(red: 0.13, green: 0.17, blue: 0.20)   // #202C33 dark gray
-private let waGreen      = Color(red: 0.00, green: 0.66, blue: 0.52)   // #00a884 green accent
-private let waCheckRead  = Color(red: 0.33, green: 0.74, blue: 0.92)   // #53bdeb blue checks
-private let waGray       = Color(red: 0.53, green: 0.59, blue: 0.63)   // #8696a0
-private let waInputField = Color(red: 0.16, green: 0.22, blue: 0.26)   // #2a3942
-private let waHeaderBg   = Color(red: 0.12, green: 0.17, blue: 0.21)   // #1f2c34
+private let waOutgoing   = Color(red: 0.18, green: 0.18, blue: 0.19)   // #2d2d30 charcoal
+private let waIncoming   = Color(red: 0.14, green: 0.14, blue: 0.15)   // #232326 dark graphite
+private let waGreen      = Color(red: 0.56, green: 0.56, blue: 0.58)   // #8e8e93 gray accent
+private let waCheckRead  = Color(red: 0.63, green: 0.63, blue: 0.65)   // #a0a0a5 light gray checks
+private let waGray       = Color(red: 0.39, green: 0.39, blue: 0.40)   // #636366 muted gray
+private let waInputField = Color(red: 0.17, green: 0.17, blue: 0.18)   // #2c2c2e graphite
+private let waHeaderBg   = Color(red: 0.11, green: 0.11, blue: 0.12)   // #1c1c1e dark
 
 // MARK: - Chat View
 
@@ -245,7 +245,7 @@ struct ChatView: View {
                         }
                     }
                     .frame(width: 44, height: 44)
-                    .background(Circle().fill(waGreen))
+                    .background(Circle().fill(Color(red: 0.40, green: 0.40, blue: 0.42)))
                 }
                 .disabled(vm.isSending)
             } else {
@@ -310,7 +310,7 @@ struct ChatView: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 42, height: 42)
-                    .background(Circle().fill(waGreen))
+                    .background(Circle().fill(Color(red: 0.40, green: 0.40, blue: 0.42)))
             }
         }
         .padding(.horizontal, 8)
@@ -336,10 +336,10 @@ struct ChatView: View {
                 Group {
                     if !vm.typingUserIds.isEmpty {
                         Text("печатает...")
-                            .foregroundStyle(waGreen)
+                            .foregroundStyle(tgOnline)
                     } else if let u = vm.peerUser {
                         Text(u.isOnline ? (u.isMobile ? "в сети с телефона" : "в сети") : u.statusText)
-                            .foregroundStyle(u.isOnline ? waGreen : waGray)
+                            .foregroundStyle(u.isOnline ? tgOnline : waGray)
                     } else if vm.isGroupChat {
                         Text("беседа")
                             .foregroundStyle(waGray)
@@ -506,8 +506,8 @@ struct BubbleView: View {
             }
             .padding(.horizontal, 12).padding(.vertical, 8)
             .background {
-                ZStack(alignment: msg.isOutgoing ? .topTrailing : .topLeading) {
-                    RoundedRectangle(cornerRadius: 16).fill(bubbleColor)
+                ZStack(alignment: msg.isOutgoing ? .bottomTrailing : .bottomLeading) {
+                    RoundedRectangle(cornerRadius: 18).fill(bubbleColor)
                     if showTail {
                         BubbleTailShape(isOutgoing: msg.isOutgoing)
                             .fill(bubbleColor)
@@ -699,7 +699,7 @@ struct BubbleView: View {
             Button { audioPlayer.toggle(url: url) } label: {
                 ZStack {
                     Circle()
-                        .fill(waGreen)
+                        .fill(Color(red: 0.40, green: 0.40, blue: 0.42))
                         .frame(width: 52, height: 52)
                     Image(systemName: playing ? "pause.fill" : "play.fill")
                         .font(.system(size: 22, weight: .bold))
@@ -1075,7 +1075,7 @@ struct InlineVideoMessageView: View {
             if isPlaying {
                 Circle()
                     .trim(from: 0, to: progress)
-                    .stroke(waGreen, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .stroke(Color(red: 0.56, green: 0.56, blue: 0.58), style: StrokeStyle(lineWidth: 3, lineCap: .round))
                     .frame(width: 200, height: 200)
                     .rotationEffect(.degrees(-90))
                     .animation(.linear(duration: 0.1), value: progress)
@@ -1187,21 +1187,20 @@ struct TGWallpaper: View {
     var body: some View {
         GeometryReader { g in
             ZStack {
-                Color(.systemGroupedBackground)
+                Color(red: 0.09, green: 0.09, blue: 0.10)
                 Canvas { ctx, size in
-                    // Subtle soft blobs
                     let blobData: [(CGFloat, CGFloat, CGFloat, CGFloat)] = [
-                        (0.15, 0.1,  250, 0.06),
-                        (0.8,  0.25, 300, 0.05),
-                        (0.3,  0.6,  280, 0.05),
-                        (0.7,  0.75, 260, 0.06),
+                        (0.15, 0.1,  250, 0.04),
+                        (0.8,  0.25, 300, 0.03),
+                        (0.3,  0.6,  280, 0.035),
+                        (0.7,  0.75, 260, 0.04),
                     ]
                     for (rx, ry, r, op) in blobData {
                         let center = CGPoint(x: size.width * rx, y: size.height * ry)
                         let rect   = CGRect(x: center.x - r, y: center.y - r,
                                            width: r * 2, height: r * 2)
                         ctx.fill(Path(ellipseIn: rect),
-                                 with: .color(tgAccent.opacity(op)))
+                                 with: .color(Color(red: 0.35, green: 0.35, blue: 0.38).opacity(op)))
                     }
                 }
             }
@@ -1232,22 +1231,22 @@ struct BubbleTailShape: Shape {
     func path(in rect: CGRect) -> Path {
         var p = Path()
         if isOutgoing {
-            // Tail pointing right-up
+            // Tail pointing right-down from bottom of bubble
             p.move(to: CGPoint(x: 0, y: 0))
-            p.addLine(to: CGPoint(x: rect.maxX, y: 0))
+            p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
             p.addCurve(
                 to: CGPoint(x: 0, y: rect.maxY),
-                control1: CGPoint(x: rect.maxX * 0.6, y: 0),
-                control2: CGPoint(x: 0, y: rect.maxY * 0.4)
+                control1: CGPoint(x: rect.maxX * 0.4, y: rect.maxY),
+                control2: CGPoint(x: 0, y: rect.maxY)
             )
         } else {
-            // Tail pointing left-up
+            // Tail pointing left-down from bottom of bubble
             p.move(to: CGPoint(x: rect.maxX, y: 0))
-            p.addLine(to: CGPoint(x: 0, y: 0))
+            p.addLine(to: CGPoint(x: 0, y: rect.maxY))
             p.addCurve(
                 to: CGPoint(x: rect.maxX, y: rect.maxY),
-                control1: CGPoint(x: rect.maxX * 0.4, y: 0),
-                control2: CGPoint(x: rect.maxX, y: rect.maxY * 0.4)
+                control1: CGPoint(x: rect.maxX * 0.6, y: rect.maxY),
+                control2: CGPoint(x: rect.maxX, y: rect.maxY)
             )
         }
         p.closeSubpath()

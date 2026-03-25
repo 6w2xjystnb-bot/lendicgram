@@ -2,8 +2,7 @@ import SwiftUI
 
 // MARK: - Chat Background with Formulas
 
-/// Telegram-style wallpaper with scattered math/physics formulas.
-/// Replaces TGWallpaper in ChatView.
+/// Graphite wallpaper with scattered math/physics formulas — dirty sketch style.
 struct ChatBackgroundView: View {
 
     // Pre-computed formula positions (seeded once per view lifetime)
@@ -12,31 +11,31 @@ struct ChatBackgroundView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                // Base color — very dark (matches Whitegram dark theme)
-                Color(red: 0.04, green: 0.08, blue: 0.10) // #0B141A
+                // Base color — dark graphite (not OLED black)
+                Color(red: 0.09, green: 0.09, blue: 0.10) // #161618
 
-                // Soft blobs (same as original TGWallpaper)
+                // Soft blobs — very muted graphite tones
                 Canvas { ctx, size in
                     let blobs: [(CGFloat, CGFloat, CGFloat, CGFloat)] = [
-                        (0.15, 0.1,  250, 0.06),
-                        (0.8,  0.25, 300, 0.05),
-                        (0.3,  0.6,  280, 0.05),
-                        (0.7,  0.75, 260, 0.06),
+                        (0.15, 0.1,  250, 0.04),
+                        (0.8,  0.25, 300, 0.03),
+                        (0.3,  0.6,  280, 0.035),
+                        (0.7,  0.75, 260, 0.04),
                     ]
                     for (rx, ry, r, op) in blobs {
                         let center = CGPoint(x: size.width * rx, y: size.height * ry)
                         let rect = CGRect(x: center.x - r, y: center.y - r,
                                           width: r * 2, height: r * 2)
                         ctx.fill(Path(ellipseIn: rect),
-                                 with: .color(tgAccent.opacity(op)))
+                                 with: .color(Color(red: 0.35, green: 0.35, blue: 0.38).opacity(op)))
                     }
                 }
 
-                // Scattered formulas
+                // Scattered formulas — subtle graphite pencil look
                 ForEach(items) { item in
                     Text(item.text)
                         .font(.system(size: item.size, weight: .regular, design: .serif))
-                        .foregroundStyle(Color(red: 0.10, green: 0.18, blue: 0.15).opacity(item.opacity * 5))
+                        .foregroundStyle(Color(red: 0.25, green: 0.25, blue: 0.27).opacity(item.opacity * 4))
                         .rotationEffect(.degrees(item.rotation))
                         .position(x: geo.size.width * item.rx,
                                   y: geo.size.height * item.ry)
