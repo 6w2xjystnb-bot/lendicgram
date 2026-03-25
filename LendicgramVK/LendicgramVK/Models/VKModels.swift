@@ -334,6 +334,7 @@ struct VKVideo: Decodable {
     let ownerId: Int?
     let title: String?
     let duration: Int?
+    let player: String?
     let image: [VKVideoImage]?
     let firstFrame: [VKVideoImage]?
     var thumbURL: URL? {
@@ -347,7 +348,7 @@ struct VKVideo: Decodable {
         return String(format: "%d:%02d", m, s)
     }
     enum CodingKeys: String, CodingKey {
-        case id; case ownerId = "owner_id"; case title; case duration
+        case id; case ownerId = "owner_id"; case title; case duration; case player
         case image; case firstFrame = "first_frame"
     }
 }

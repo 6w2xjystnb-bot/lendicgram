@@ -2,6 +2,10 @@ import SwiftUI
 import AVFoundation
 import PhotosUI
 
+extension URL: @retroactive Identifiable {
+    public var id: String { absoluteString }
+}
+
 // MARK: - Graphite Dark Theme Colors (dirty sketch style)
 
 private let waOutgoing   = Color(red: 0.18, green: 0.18, blue: 0.19)   // #2d2d30 charcoal
@@ -25,6 +29,8 @@ struct ChatView: View {
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var showStickers  = false
     @State private var showVideoRecorder = false
+    @State private var selectedPhotoURL: URL?
+    @State private var selectedVideoURL: URL?
 
     init(peerId: Int, peerName: String) {
         self.peerId   = peerId
@@ -67,6 +73,12 @@ struct ChatView: View {
             } onCancel: {
                 showVideoRecorder = false
             }
+        }
+        .fullScreenCover(item: $selectedPhotoURL) { url in
+            PhotoViewerView(url: url)
+        }
+        .fullScreenCover(item: $selectedVideoURL) { url in
+            VideoPlayerView(playerURL: url)
         }
     }
 
@@ -658,52 +670,65 @@ struct BubbleView: View {
                     .frame(width: w, height: h)
                     .overlay(ProgressView().tint(waGreen))
             }
+            .contentShape(Rectangle())
+            .onTapGesture { selectedPhotoURL = url }
         }
     }
 
     // Video
     @ViewBuilder
     func videoView(_ video: VKVideo?) -> some View {
-        ZStack(alignment: .bottomLeading) {
-            if let url = video?.thumbURL {
-                CachedAsyncImage(url: url) { img in
-                    img.resizable().scaledToFill()
-                        .frame(width: 240, height: 160).clipped()
-                } placeholder: {
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: .bottomLeading) {
+                if let url = video?.thumbURL {
+                    CachedAsyncImage(url: url) { img in
+                        img.resizable().scaledToFill()
+                            .frame(width: 240, height: 160).clipped()
+                    } placeholder: {
+                        Rectangle()
+                            .fill(waIncoming)
+                            .frame(width: 240, height: 160)
+                    }
+                } else {
                     Rectangle()
                         .fill(waIncoming)
                         .frame(width: 240, height: 160)
                 }
-            } else {
-                Rectangle()
-                    .fill(waIncoming)
-                    .frame(width: 240, height: 160)
-            }
-            // Play button
-            Circle()
-                .fill(Color.black.opacity(0.45))
-                .frame(width: 48, height: 48)
-                .overlay(
-                    Image(systemName: "play.fill")
+                // Play button
+                Circle()
+                    .fill(Color.black.opacity(0.45))
+                    .frame(width: 48, height: 48)
+                    .overlay(
+                        Image(systemName: "play.fill")
+                            .foregroundStyle(.white)
+                            .font(.system(size: 18))
+                    )
+                    .position(x: 120, y: 80)
+                // Duration badge
+                if let d = video?.durationFormatted, !d.isEmpty {
+                    Text(d)
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.white)
-                        .font(.system(size: 18))
-                )
-                .position(x: 120, y: 80)
-            // Duration badge
-            if let d = video?.durationFormatted, !d.isEmpty {
-                Text(d)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6).padding(.vertical, 3)
-                    .background(Capsule().fill(Color.black.opacity(0.55)))
-                    .padding(8)
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(Capsule().fill(Color.black.opacity(0.55)))
+                        .padding(8)
+                }
             }
-        }
-        if let title = video?.title, !title.isEmpty {
-            Text(title)
-                .font(.system(size: 14))
-                .foregroundStyle(waGreen)
-                .lineLimit(2)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if let p = video?.player, let url = URL(string: p) {
+                    selectedVideoURL = url
+                } else if let vid = video?.id, let oid = video?.ownerId,
+                          let url = URL(string: "https://vk.com/video\(oid)_\(vid)") {
+                    selectedVideoURL = url
+                }
+            }
+            if let title = video?.title, !title.isEmpty {
+                Text(title)
+                    .font(.system(size: 14))
+                    .foregroundStyle(waGreen)
+                    .lineLimit(2)
+            }
         }
     }
 
