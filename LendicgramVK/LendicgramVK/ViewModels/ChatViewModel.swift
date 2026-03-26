@@ -29,6 +29,13 @@ final class ChatViewModel: ObservableObject {
     init(peerId: Int, peerName: String) {
         self.peerId   = peerId
         self.peerName = peerName
+        // Pre-populate from cache synchronously so the view renders with content on first layout,
+        // allowing .defaultScrollAnchor(.bottom) to position correctly without a scroll jump.
+        if let cached = ChatCache.shared.loadMessages(peerId: peerId) {
+            _messages    = Published(initialValue: cached.messages)
+            _totalCount  = Published(initialValue: cached.totalCount)
+            _hasMore     = Published(initialValue: cached.messages.count < cached.totalCount)
+        }
         setupSubscriptions()
     }
 
@@ -85,22 +92,21 @@ final class ChatViewModel: ObservableObject {
     // MARK: - Load
 
     func load() async {
-        // Try loading from cache first
-        if let cached = ChatCache.shared.loadMessages(peerId: peerId) {
-            messages = cached.messages
-            totalCount = cached.totalCount
-            hasMore = messages.count < totalCount
-            lastMessageId = messages.last?.id
-        }
-        isLoading = messages.isEmpty
+        // Cache was already loaded in init(). Only show loading spinner if no cached data.
+        let hadCachedData = !messages.isEmpty
+        isLoading = !hadCachedData
         do {
             let r = try await api.getHistory(peerId: peerId)
             messages   = r.items.reversed()
             totalCount = r.count
             hasMore    = messages.count < totalCount
-            lastMessageId = messages.last?.id
             r.profiles?.forEach { profiles[$0.id] = $0 }
             r.groups?.forEach   { groups[-$0.id]  = $0 }
+            // On first-ever open (no cache), LazyVStack needs a render cycle before scrollTo works
+            if !hadCachedData {
+                try? await Task.sleep(for: .milliseconds(120))
+            }
+            lastMessageId = messages.last?.id
         } catch { self.error = error.localizedDescription }
         isLoading = false
 

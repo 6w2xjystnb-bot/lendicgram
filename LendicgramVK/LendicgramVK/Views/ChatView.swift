@@ -25,10 +25,16 @@ struct ChatView: View {
     @StateObject private var vm: ChatViewModel
     @StateObject private var audioPlayer = AudioPlayerService.shared
     @StateObject private var recorder = AudioRecorderService.shared
-    @State private var input         = ""
+    @State private var input              = ""
     @State private var pickerItems: [PhotosPickerItem] = []
-    @State private var showStickers  = false
-    @State private var showVideoRecorder = false
+    @State private var showStickers       = false
+    @State private var showVideoRecorder  = false
+
+    // iMessage-style flying bubble animation
+    @State private var flyText    = ""
+    @State private var flyVisible = false
+    @State private var flyOffset  = CGSize.zero
+    @State private var flyOpacity: Double = 1
 
     init(peerId: Int, peerName: String) {
         self.peerId   = peerId
@@ -50,6 +56,27 @@ struct ChatView: View {
                     }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
+            }
+
+            // iMessage-style flying bubble overlay
+            if flyVisible {
+                HStack {
+                    Spacer()
+                    Text(flyText)
+                        .font(.system(size: 16))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14).padding(.vertical, 9)
+                        .background(RoundedRectangle(cornerRadius: 20).fill(waOutgoing))
+                        .lineLimit(4)
+                        .frame(maxWidth: 280, alignment: .trailing)
+                }
+                .padding(.trailing, 16)
+                .padding(.bottom, 80)
+                .offset(flyOffset)
+                .opacity(flyOpacity)
+                .allowsHitTesting(false)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .ignoresSafeArea(edges: .bottom)
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -236,7 +263,25 @@ struct ChatView: View {
             // Send / Mic — individual element
             if hasText {
                 Button {
-                    Task { await vm.send(text: input); input = "" }
+                    let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !text.isEmpty else { return }
+                    input = ""
+                    // Launch flying bubble
+                    flyText = text
+                    flyOffset = .zero
+                    flyOpacity = 1
+                    flyVisible = true
+                    withAnimation(.spring(duration: 0.48, bounce: 0.1)) {
+                        flyOffset = CGSize(width: 0, height: -600)
+                    }
+                    withAnimation(.easeIn(duration: 0.25).delay(0.18)) {
+                        flyOpacity = 0
+                    }
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(520))
+                        flyVisible = false
+                    }
+                    Task { await vm.send(text: text) }
                 } label: {
                     Group {
                         if vm.isSending {
@@ -433,16 +478,33 @@ struct BubbleView: View {
     @State private var selectedVideoURL: URL?
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 0) {
+        HStack(alignment: .bottom, spacing: 6) {
             if msg.isOutgoing { Spacer(minLength: 60) }
 
-            VStack(alignment: msg.isOutgoing ? .trailing : .leading, spacing: 2) {
-                if showSender {
-                    Text(profiles[msg.fromId]?.firstName ?? "")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(senderColor(msg.fromId))
-                        .padding(.horizontal, 14)
+            // Sender avatar (group chats only, left side of incoming messages)
+            if showSender {
+                if showTail {
+                    let avatarURL = profiles[msg.fromId]?.avatarURL
+                    Group {
+                        if let url = avatarURL {
+                            CachedAsyncImage(url: url) { img in
+                                img.resizable().scaledToFill()
+                                    .frame(width: 30, height: 30)
+                                    .clipShape(Circle())
+                            } placeholder: {
+                                Circle().fill(waGray).frame(width: 30, height: 30)
+                            }
+                        } else {
+                            Circle().fill(waGray).frame(width: 30, height: 30)
+                        }
+                    }
+                } else {
+                    // Invisible spacer to keep bubble alignment consistent
+                    Color.clear.frame(width: 30)
                 }
+            }
+
+            VStack(alignment: msg.isOutgoing ? .trailing : .leading, spacing: 2) {
                 bubble
             }
             .padding(msg.isOutgoing ? .trailing : .leading, 4)
@@ -520,6 +582,11 @@ struct BubbleView: View {
                 }
                 // Text content + non-media attachments below
                 VStack(alignment: .leading, spacing: 6) {
+                    if showSender {
+                        Text(profiles[msg.fromId]?.firstName ?? "")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(senderColor(msg.fromId))
+                    }
                     if let reply = msg.replyMessage {
                         replyPreview(reply)
                     }
@@ -687,57 +754,49 @@ struct BubbleView: View {
     // Video
     @ViewBuilder
     func videoView(_ video: VKVideo?) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ZStack(alignment: .bottomLeading) {
-                if let url = video?.thumbURL {
-                    CachedAsyncImage(url: url) { img in
-                        img.resizable().scaledToFill()
-                            .frame(width: 240, height: 160).clipped()
-                    } placeholder: {
-                        Rectangle()
-                            .fill(waIncoming)
-                            .frame(width: 240, height: 160)
-                    }
-                } else {
-                    Rectangle()
-                        .fill(waIncoming)
-                        .frame(width: 240, height: 160)
+        let ratio: CGFloat = video?.aspectRatio ?? (16.0 / 9.0)
+        let w: CGFloat = 240
+        let h: CGFloat = min(360, max(100, w / ratio))
+        ZStack {
+            if let url = video?.thumbURL {
+                CachedAsyncImage(url: url) { img in
+                    img.resizable().scaledToFill()
+                        .frame(width: w, height: h).clipped()
+                } placeholder: {
+                    Rectangle().fill(waIncoming).frame(width: w, height: h)
                 }
-                // Play button
-                Circle()
-                    .fill(Color.black.opacity(0.45))
-                    .frame(width: 48, height: 48)
-                    .overlay(
-                        Image(systemName: "play.fill")
-                            .foregroundStyle(.white)
-                            .font(.system(size: 18))
-                    )
-                    .position(x: 120, y: 80)
-                // Duration badge
-                if let d = video?.durationFormatted, !d.isEmpty {
-                    Text(d)
-                        .font(.system(size: 12, weight: .medium))
+            } else {
+                Rectangle().fill(waIncoming).frame(width: w, height: h)
+            }
+            // Play button centered
+            Circle()
+                .fill(Color.black.opacity(0.45))
+                .frame(width: 48, height: 48)
+                .overlay(
+                    Image(systemName: "play.fill")
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 6).padding(.vertical, 3)
-                        .background(Capsule().fill(Color.black.opacity(0.55)))
-                        .padding(8)
-                }
+                        .font(.system(size: 18))
+                )
+            // Duration badge bottom-left
+            if let d = video?.durationFormatted, !d.isEmpty {
+                Text(d)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6).padding(.vertical, 3)
+                    .background(Capsule().fill(Color.black.opacity(0.55)))
+                    .frame(width: w, height: h, alignment: .bottomLeading)
+                    .padding(8)
             }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                guard let vid = video?.id, let oid = video?.ownerId else { return }
-                Task {
-                    if let full = try? await VKAPIService.shared.getVideo(ownerId: oid, videoId: vid, accessKey: video?.accessKey),
-                       let url = full.bestFileURL {
-                        selectedVideoURL = url
-                    }
+        }
+        .frame(width: w, height: h)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard let vid = video?.id, let oid = video?.ownerId else { return }
+            Task {
+                if let full = try? await VKAPIService.shared.getVideo(ownerId: oid, videoId: vid, accessKey: video?.accessKey),
+                   let url = full.bestFileURL {
+                    selectedVideoURL = url
                 }
-            }
-            if let title = video?.title, !title.isEmpty {
-                Text(title)
-                    .font(.system(size: 14))
-                    .foregroundStyle(waGreen)
-                    .lineLimit(2)
             }
         }
     }

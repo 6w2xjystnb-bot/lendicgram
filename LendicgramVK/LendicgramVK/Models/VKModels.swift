@@ -347,6 +347,12 @@ struct VKVideo: Decodable {
         return imgs.max(by: { ($0.width ?? 0) < ($1.width ?? 0) })
             .flatMap { URL(string: $0.url) }
     }
+    var aspectRatio: CGFloat {
+        let imgs = (image ?? firstFrame ?? []).filter { ($0.width ?? 0) > 0 && ($0.height ?? 0) > 0 }
+        guard let largest = imgs.max(by: { ($0.width ?? 0) < ($1.width ?? 0) }),
+              let w = largest.width, let h = largest.height, h > 0 else { return 16.0 / 9.0 }
+        return CGFloat(w) / CGFloat(h)
+    }
     var durationFormatted: String {
         guard let d = duration else { return "" }
         let m = d / 60; let s = d % 60

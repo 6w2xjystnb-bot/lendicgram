@@ -240,9 +240,17 @@ final class VKAPIService {
 
     /// Upload video message (кружок): get upload URL → multipart upload → save → return attachment string
     func uploadVideoMessage(peerId: Int, fileURL: URL) async throws -> String {
-        // 1. Get upload server for video_message type (same as audio_message flow)
-        let server: DocUploadServerResponse = try await get(
-            "docs.getMessagesUploadServer", ["peer_id": "\(peerId)", "type": "video_message"])
+        // 1. Get upload server for video_message type
+        // NOTE: requires "docs" scope in the OAuth token — if the error says "type should be …"
+        // it means the current token was issued without docs scope and the user must re-login.
+        let server: DocUploadServerResponse
+        do {
+            server = try await get(
+                "docs.getMessagesUploadServer", ["peer_id": "\(peerId)", "type": "video_message"])
+        } catch VKAPIError.apiError(let code, let msg) where msg.lowercased().contains("type should be") {
+            throw VKAPIError.apiError(code: code,
+                msg: "Для отправки кружков нужно обновить разрешения. Выйдите из аккаунта и войдите заново.")
+        }
 
         guard let uploadURL = URL(string: server.uploadUrl) else {
             throw VKAPIError.invalidURL
