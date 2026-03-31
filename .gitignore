@@ -17,6 +17,10 @@ sc/.venv/
 .DS_Store
 Thumbs.db
 
+# Swift Package Manager
+.build/
+.swiftpm/xcode/
+
 # IPA files — exclude original (too large for GitHub free)
 # blenka.ipa
 # Only keep the patched one output by CI
