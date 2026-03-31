@@ -97,7 +97,7 @@
 				F026,
 				F016,
 			);
-			path = LendicgramVK;
+			path = "../LendicgramVK.swiftpm";
 			sourceTree = "<group>";
 		};
 		GRP_PROD /* Products */ = {

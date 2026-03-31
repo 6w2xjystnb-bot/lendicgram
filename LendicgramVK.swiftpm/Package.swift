@@ -30,7 +30,7 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "AppModule",
-            path: "LendicgramVK.swiftpm",
+            path: ".",
             resources: [
                 .process("Assets.xcassets")
             ],
