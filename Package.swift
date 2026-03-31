@@ -1,11 +1,11 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.0
 import PackageDescription
 import AppleProductTypes
 
 let package = Package(
     name: "LendicgramVK",
     platforms: [
-        .iOS("17.0")
+        .iOS("26.0")
     ],
     products: [
         .iOSApplication(
@@ -15,7 +15,7 @@ let package = Package(
             teamIdentifier: "",
             displayVersion: "1.0",
             bundleVersion: "1",
-            appIcon: .placeholder(icon: .bird),
+            appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.blue),
             supportedDeviceFamilies: [.pad, .phone],
             supportedInterfaceOrientations: [
@@ -33,6 +33,9 @@ let package = Package(
             path: "LendicgramVK/LendicgramVK",
             resources: [
                 .process("Assets.xcassets")
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v5)
             ]
         )
     ]
